@@ -1,0 +1,30 @@
+timezone: America/New_York
+
+display_nicknames: true
+display_weather: true
+display_winds: true
+
+message_file: /var/lib/manifest-server/message
+
+server:
+  http_address: ":8080"
+  https_address: ":https"
+  #cert_file: /etc/cert/services.jumptown.com.pem
+
+burble:
+  dzid: 417
+
+metar:
+  enabled: true
+  station: KORE
+
+winds:
+  enabled: true
+  latitude: 42.57013
+  longitude: -72.28861
+
+jumprun:
+  enabled: true
+  latitude: 42.5700
+  longitude: -72.2885
+  state_file: /var/lib/manifest-server/jumprun.state

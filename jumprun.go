@@ -1,0 +1,244 @@
+// (c) Copyright 2017-2020 Matt Messier
+
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+)
+
+// Settings stores dynamically configurable information
+type JumprunTurn struct {
+	Distance int `json:"distance"` // tenths of a mile
+	Heading  int `json:"heading"`  // degrees from magnetic north
+}
+
+type JumprunUpdate func([]byte, string, time.Time)
+
+type Jumprun struct {
+	TimeStamp    int64          `json:"timestamp"`     // time when set (UTC UnixNano)
+	Heading      int            `json:"heading"`       // degrees from magnetic north
+	ExitDistance int            `json:"exit_distance"` // tenths of a mile
+	HookTurns    [4]JumprunTurn `json:"hook_turns"`    // list of turns if there's a hook
+	Latitude     string         `json:"latitude"`      // latitude of jumprun origin
+	Longitude    string         `json:"longitude"`     // longitude of jumprun origin
+	IsSet        bool           `json:"is_set"`        // true if jumprun is set
+
+	stateFilename string
+	updateFunc    JumprunUpdate
+
+	lock     sync.Mutex
+	template *template.Template
+}
+
+func NewJumprun(
+	stateFilename, latitude, longitude string,
+	updateFunc JumprunUpdate,
+) *Jumprun {
+	j := &Jumprun{
+		Latitude:      latitude,
+		Longitude:     longitude,
+		stateFilename: stateFilename,
+		updateFunc:    updateFunc,
+	}
+	if err := j.restore(); err != nil {
+		fmt.Fprintf(os.Stderr, "cannot restore jumprun state: %v\n", err)
+	} else if j.Latitude != latitude || j.Longitude != longitude {
+		j.Reset()
+	}
+	return j
+}
+
+func (j *Jumprun) Reset() {
+	j.lock.Lock()
+	defer j.lock.Unlock()
+
+	j.TimeStamp = time.Now().Unix()
+	j.IsSet = false
+	j.updateStaticData()
+}
+
+func (j *Jumprun) SetFromURLValues(values url.Values) error {
+	var (
+		err error
+		v   int64
+	)
+
+	newj := Jumprun{}
+	if v, err = strconv.ParseInt(values.Get("main_heading"), 10, 32); err != nil {
+		return fmt.Errorf("cannot parse main heading: %v", err)
+	}
+	if v < 0 || v > 359 {
+		return fmt.Errorf("main heading out of range: %d", v)
+	}
+	newj.Heading = int(v)
+
+	if v, err = strconv.ParseInt(values.Get("exit_distance"), 10, 32); err != nil {
+		return fmt.Errorf("cannot parse exit distance: %v", err)
+	}
+	newj.ExitDistance = int(v)
+
+	for i := 0; i < len(j.HookTurns); i++ {
+		var turn JumprunTurn
+		key := fmt.Sprintf("hook_heading_%d", i)
+		value := values.Get(key)
+		if value == "" {
+			break
+		}
+
+		if v, err = strconv.ParseInt(value, 10, 32); err != nil {
+			return fmt.Errorf("cannot parse hook heading %d: %v", i, err)
+		}
+		if v < 0 || v > 359 {
+			return fmt.Errorf("hook heading %d out of range: %d", i, v)
+		}
+		turn.Heading = int(v)
+
+		key = fmt.Sprintf("hook_distance_%d", i)
+		if v, err = strconv.ParseInt(values.Get(key), 10, 32); err != nil {
+			return fmt.Errorf("cannot parse hook distance %d: %v", i, err)
+		}
+		turn.Distance = int(v)
+		newj.HookTurns[i] = turn
+	}
+
+	j.lock.Lock()
+	defer j.lock.Unlock()
+	j.TimeStamp = time.Now().Unix()
+	j.Heading = newj.Heading
+	j.ExitDistance = newj.ExitDistance
+	j.HookTurns = newj.HookTurns
+	j.updateStaticData()
+
+	return nil
+}
+
+func (j *Jumprun) updateStaticData() {
+	modtime := time.Unix(j.TimeStamp, 0)
+	content, _ := json.Marshal(j)
+	if j.updateFunc != nil {
+		j.updateFunc(content, mimetypeJSON, modtime)
+	}
+}
+
+func (j *Jumprun) restore() error {
+	dataBytes, err := ioutil.ReadFile(j.stateFilename)
+	if err != nil {
+		return err
+	}
+
+	if err = json.Unmarshal(dataBytes, j); err != nil {
+		return err
+	}
+
+	j.updateStaticData()
+	return nil
+}
+
+func (j *Jumprun) Write() error {
+	j.lock.Lock()
+	defer j.lock.Unlock()
+	dataBytes, err := json.Marshal(j)
+	if err != nil {
+		return err
+	}
+
+	tempFilename := j.stateFilename + ".tmp"
+	if err = ioutil.WriteFile(tempFilename, dataBytes, 0600); err == nil {
+		_ = os.Rename(tempFilename, j.stateFilename)
+	}
+	return err
+}
+
+func (j *Jumprun) initializeTemplate() *template.Template {
+	j.lock.Lock()
+	defer j.lock.Unlock()
+
+	if j.template == nil {
+		var err error
+		j.template, err = template.New("jumprun").Parse(jumprunHTML)
+		if err != nil {
+			// This should never fail -- the HTML is hard-coded, so
+			// panic if this happens, because it means it's an error
+			// that will never not happen.
+			panic(err)
+		}
+	}
+	return j.template
+}
+
+func (j *Jumprun) HTML(w http.ResponseWriter, req *http.Request) {
+	tmpl := j.initializeTemplate()
+	if tmpl == nil {
+		http.NotFound(w, req)
+		return
+	}
+
+	b := &bytes.Buffer{}
+	if err := tmpl.Execute(b, j); err != nil {
+		http.NotFound(w, req)
+		return
+	}
+	w.Header().Set("Content-Type", mimetypeHTML)
+	r := bytes.NewReader(b.Bytes())
+	http.ServeContent(w, req, "", time.Now(), r)
+}
+
+const jumprunHTML = `<html>
+	<head>
+		<title>Manifest - Set Jump Run</title>
+	</head>
+	<body>
+		<form action="/setjumprun" method="post">
+			<div>
+				All headings are relative to magentic north. All distances are
+				specified in tenths of a mile (e.g. 1 is 1/10 mile, 5 is
+				1/2 mile, 10 is 1 mile, etc.).  The exit distance is the offset
+				from center where the pilot will turn on the green light. A
+				negative value means that the exit point is before center. A
+				positive value means that the exit point is after center.
+			</div>
+			<div>
+				<hr>
+				<h3>Jump Run</h3>
+			</div>
+			<div>
+				<label>Heading:</label>
+				<input type="text" name="main_heading" value="{{.Heading}}">
+			</div>
+			<div>
+				<label>Exit Distance:<label>
+				<input type="text" name="exit_distance" value="{{.ExitDistance}}">
+			</div>
+			<div>
+			<hr>
+			<h3>Hook Points</h3>
+			Leave these blank if there is to be no hook.
+			<p>
+			</div>
+			{{range $index, $element := .HookTurns}}
+			<div>
+				<label>Distance:<label>
+				<input type="text" name="hook_distance_{{$index}}" value="{{$element.Distance}}">
+				<label>Heading:<label>
+				<input type="text" name="hook_heading_{{$index}}" value="{{$element.Heading}}">
+			</div>
+			{{end}}
+			<div>
+				<hr>
+				<button type="reset">Reset</button>
+				<button type="submit">Submit</button>
+			</div>
+		</form>
+	</body>
+</html>
+`
