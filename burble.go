@@ -197,15 +197,17 @@ func (b *Burble) Refresh() error {
 		name := loadData["name"].(string)
 		l.LoadNumber = strings.TrimSpace(name[len(l.AircraftName)+1:])
 
-		slots, ok := loadData["slots"].(map[string]interface{})
-		if !ok {
-			slots = make(map[string]interface{})
-		}
+		// Reporting of available slots seems to be something Burble has
+		// had ongoing difficulties with. How it's reported and its own
+		// code for rendering it has evolved over the years, but in the
+		// spring of 2021 it was completely broken, so rather than trust
+		// the summary data we're given, we now compute it ourselves.
+		// Burble has since fixed its spring 2021 breakage, but using
+		// our own computation has continued to work and I'm feeling
+		// more trusting of it given the troubled history here.
+		var privateSlots, publicSlots int64
 		maxSlots := decodeInt("max_slots", loadData["max_slots"])
-		privateSlots := decodeInt("slots.private_slots", slots["private_slots"])
-		publicSlots := decodeInt("slots.public_slots", slots["public_slots"])
 		reserveSlots := decodeInt("reserve_slots", loadData["reserve_slots"])
-		l.SlotsAvailable = maxSlots - (publicSlots + privateSlots) - reserveSlots
 
 		groups := loadData["groups"].([]interface{})
 		for _, rawGroupData := range groups {
@@ -232,8 +234,11 @@ func (b *Burble) Refresh() error {
 			}
 			for i, rawMemberData := range members {
 				memberData = rawMemberData.(map[string]interface{})
-				if !decodeBool("is_public", memberData["is_public"]) {
-					l.SlotsAvailable++
+				switch {
+				case decodeBool("is_public", memberData["is_public"]):
+					publicSlots++
+				case decodeBool("is_private", memberData["is_private"]):
+					privateSlots++
 				}
 				if i < 1 {
 					continue
@@ -253,6 +258,19 @@ func (b *Burble) Refresh() error {
 					jumper.ShortName = "Handycam"
 				}
 				primaryJumper.AddGroupMember(jumper)
+			}
+
+			// Make private slots count against reserve slots. It
+			// would seem to be the case that PrivateSlots mean
+			// ReserveSlots that are manifested. The zero caps here
+			// shouldn't be needed, but are included for "safety"
+			reserveSlots -= privateSlots
+			if reserveSlots < 0 {
+				reserveSlots = 0
+			}
+			l.SlotsAvailable = maxSlots - publicSlots - privateSlots - reserveSlots
+			if l.SlotsAvailable < 0 {
+				l.SlotsAvailable = 0
 			}
 		}
 
