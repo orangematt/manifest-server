@@ -25,13 +25,15 @@ type JumprunTurn struct {
 type JumprunUpdate func([]byte, string, time.Time)
 
 type Jumprun struct {
-	TimeStamp    int64          `json:"timestamp"`     // time when set (UTC UnixNano)
-	Heading      int            `json:"heading"`       // degrees from magnetic north
-	ExitDistance int            `json:"exit_distance"` // tenths of a mile
-	HookTurns    [4]JumprunTurn `json:"hook_turns"`    // list of turns if there's a hook
-	Latitude     string         `json:"latitude"`      // latitude of jumprun origin
-	Longitude    string         `json:"longitude"`     // longitude of jumprun origin
-	IsSet        bool           `json:"is_set"`        // true if jumprun is set
+	TimeStamp      int64          `json:"timestamp"`       // time when set (UTC UnixNano)
+	Heading        int            `json:"heading"`         // degrees from magnetic north
+	ExitDistance   int            `json:"exit_distance"`   // tenths of a mile
+	OffsetHeading  int            `json:"offset_heading"`  // degrees from magnetic north
+	OffsetDistance int            `json:"offset_distance"` // tenths of a mile
+	HookTurns      [4]JumprunTurn `json:"hook_turns"`      // list of turns if there's a hook
+	Latitude       string         `json:"latitude"`        // latitude of jumprun origin
+	Longitude      string         `json:"longitude"`       // longitude of jumprun origin
+	IsSet          bool           `json:"is_set"`          // true if jumprun is set
 
 	stateFilename string
 	updateFunc    JumprunUpdate
@@ -67,25 +69,47 @@ func (j *Jumprun) Reset() {
 	j.updateStaticData()
 }
 
+func (j *Jumprun) getIntValue(values url.Values, key string, defaultValue int) (int, error) {
+	v := values.Get(key)
+	if v == "" {
+		return defaultValue, nil
+	}
+	value, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		return defaultValue, fmt.Errorf("cannot parse %s: %v", key, err)
+	}
+	return int(value), nil
+}
+
 func (j *Jumprun) SetFromURLValues(values url.Values) error {
 	var (
 		err error
-		v   int64
+		v   int
 	)
 
 	newj := Jumprun{}
-	if v, err = strconv.ParseInt(values.Get("main_heading"), 10, 32); err != nil {
-		return fmt.Errorf("cannot parse main heading: %v", err)
+	if v, err = newj.getIntValue(values, "main_heading", 0); err != nil {
+		return err
 	}
 	if v < 0 || v > 359 {
 		return fmt.Errorf("main heading out of range: %d", v)
 	}
-	newj.Heading = int(v)
+	newj.Heading = v
 
-	if v, err = strconv.ParseInt(values.Get("exit_distance"), 10, 32); err != nil {
-		return fmt.Errorf("cannot parse exit distance: %v", err)
+	if v, err = newj.getIntValue(values, "exit_distance", 0); err != nil {
+		return err
 	}
-	newj.ExitDistance = int(v)
+	newj.ExitDistance = v
+
+	if v, err = newj.getIntValue(values, "offset_heading", 0); err != nil {
+		return err
+	}
+	newj.OffsetHeading = v
+
+	if v, err = newj.getIntValue(values, "offset_distance", 0); err != nil {
+		return err
+	}
+	newj.OffsetDistance = v
 
 	for i := 0; i < len(j.HookTurns); i++ {
 		var turn JumprunTurn
@@ -95,19 +119,20 @@ func (j *Jumprun) SetFromURLValues(values url.Values) error {
 			break
 		}
 
-		if v, err = strconv.ParseInt(value, 10, 32); err != nil {
+		var v64 int64
+		if v64, err = strconv.ParseInt(value, 10, 32); err != nil {
 			return fmt.Errorf("cannot parse hook heading %d: %v", i, err)
 		}
 		if v < 0 || v > 359 {
-			return fmt.Errorf("hook heading %d out of range: %d", i, v)
+			return fmt.Errorf("hook heading %d out of range: %d", i, v64)
 		}
-		turn.Heading = int(v)
+		turn.Heading = int(v64)
 
 		key = fmt.Sprintf("hook_distance_%d", i)
-		if v, err = strconv.ParseInt(values.Get(key), 10, 32); err != nil {
+		if v64, err = strconv.ParseInt(values.Get(key), 10, 32); err != nil {
 			return fmt.Errorf("cannot parse hook distance %d: %v", i, err)
 		}
-		turn.Distance = int(v)
+		turn.Distance = int(v64)
 		newj.HookTurns[i] = turn
 	}
 
@@ -218,6 +243,13 @@ const jumprunHTML = `<html>
 			<div>
 				<label>Exit Distance:<label>
 				<input type="text" name="exit_distance" value="{{.ExitDistance}}">
+			</div>
+			<div>
+				<h4>Offset:</h4>
+				<label>Heading:</label>
+				<input type="text" name="offset_heading" value="{{.OffsetHeading}}">
+				<label>Distance:</label>
+				<input type="text" name="offset_distance" value="{{.OffsetDistance}}">
 			</div>
 			<div>
 			<hr>
