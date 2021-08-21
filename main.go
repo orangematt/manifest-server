@@ -518,13 +518,7 @@ func main() {
 		longitude := config.GetString("winds.longitude")
 		windsAloftSource = NewWindsAloft(latitude, longitude)
 		launchDataSource(
-			func() time.Time {
-				now := time.Now().In(time.UTC)
-				if now.Sub(windsAloftSource.ValidTime()) > 1*time.Hour {
-					return time.Now().Add(2 * time.Minute)
-				}
-				return time.Now().Truncate(1 * time.Hour).Add(1*time.Hour + 1*time.Minute)
-			},
+			func() time.Time { return time.Now().Add(15 * time.Minute) },
 			"Winds Aloft",
 			windsAloftSource.Refresh,
 			func() {
