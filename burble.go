@@ -259,19 +259,19 @@ func (b *Burble) Refresh() error {
 				}
 				primaryJumper.AddGroupMember(jumper)
 			}
+		}
 
-			// Make private slots count against reserve slots. It
-			// would seem to be the case that PrivateSlots mean
-			// ReserveSlots that are manifested. The zero caps here
-			// shouldn't be needed, but are included for "safety"
-			reserveSlots -= privateSlots
-			if reserveSlots < 0 {
-				reserveSlots = 0
-			}
-			l.SlotsAvailable = maxSlots - publicSlots - privateSlots - reserveSlots
-			if l.SlotsAvailable < 0 {
-				l.SlotsAvailable = 0
-			}
+		// Make private slots count against reserve slots. It
+		// would seem to be the case that PrivateSlots mean
+		// ReserveSlots that are manifested. The zero caps here
+		// shouldn't be needed, but are included for "safety"
+		reserveSlots -= privateSlots
+		if reserveSlots < 0 {
+			reserveSlots = 0
+		}
+		l.SlotsAvailable = maxSlots - publicSlots - privateSlots - reserveSlots
+		if l.SlotsAvailable < 0 {
+			l.SlotsAvailable = 0
 		}
 
 		loads = append(loads, &l)
