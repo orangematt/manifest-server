@@ -22,7 +22,7 @@ type JumprunTurn struct {
 	Heading  int `json:"heading"`  // degrees from magnetic north
 }
 
-type JumprunUpdate func([]byte, string, time.Time)
+type JumprunUpdate func(Jumprun)
 
 type Jumprun struct {
 	TimeStamp      int64          `json:"timestamp"`       // time when set (UTC UnixNano)
@@ -34,7 +34,10 @@ type Jumprun struct {
 	Latitude       string         `json:"latitude"`        // latitude of jumprun origin
 	Longitude      string         `json:"longitude"`       // longitude of jumprun origin
 	IsSet          bool           `json:"is_set"`          // true if jumprun is set
+}
 
+type JumprunManager struct {
+	jumprun       Jumprun
 	stateFilename string
 	updateFunc    JumprunUpdate
 
@@ -42,31 +45,56 @@ type Jumprun struct {
 	template *template.Template
 }
 
-func NewJumprun(
+func NewJumprunManager(
 	stateFilename, latitude, longitude string,
 	updateFunc JumprunUpdate,
-) *Jumprun {
-	j := &Jumprun{
-		Latitude:      latitude,
-		Longitude:     longitude,
+) *JumprunManager {
+	j := &JumprunManager{
+		jumprun: Jumprun{
+			Latitude:  latitude,
+			Longitude: longitude,
+		},
 		stateFilename: stateFilename,
 		updateFunc:    updateFunc,
 	}
 	if err := j.restore(); err != nil {
 		fmt.Fprintf(os.Stderr, "cannot restore jumprun state: %v\n", err)
-	} else if j.Latitude != latitude || j.Longitude != longitude {
+	} else if j.jumprun.Latitude != latitude || j.jumprun.Longitude != longitude {
 		j.Reset()
 	}
 	return j
 }
 
-func (j *Jumprun) Reset() {
+func (j *JumprunManager) Jumprun() Jumprun {
+	return j.jumprun
+}
+
+func (j *JumprunManager) Reset() {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	j.TimeStamp = time.Now().Unix()
-	j.IsSet = false
+	j.jumprun = Jumprun{
+		TimeStamp: time.Now().Unix(),
+	}
 	j.updateStaticData()
+}
+
+func (j *Jumprun) LegacyContent() []byte {
+	b := bytes.Buffer{}
+
+	if !j.IsSet {
+		b.WriteString("unset\n")
+	} else {
+		b.WriteString(fmt.Sprintf("%d %d %d %d\n", j.Heading, j.ExitDistance, j.OffsetHeading, j.OffsetDistance))
+		for _, turn := range j.HookTurns {
+			if turn.Heading == 0 && turn.Distance == 0 {
+				break
+			}
+			b.WriteString(fmt.Sprintf("%d %d\n", turn.Heading, turn.Distance))
+		}
+	}
+
+	return b.Bytes()
 }
 
 func (j *Jumprun) getIntValue(values url.Values, key string, defaultValue int) (int, error) {
@@ -81,13 +109,16 @@ func (j *Jumprun) getIntValue(values url.Values, key string, defaultValue int) (
 	return int(value), nil
 }
 
-func (j *Jumprun) SetFromURLValues(values url.Values) error {
+func (j *JumprunManager) SetFromURLValues(values url.Values) error {
 	var (
 		err error
 		v   int
 	)
 
-	newj := Jumprun{}
+	newj := Jumprun{
+		TimeStamp: time.Now().Unix(),
+		IsSet:     true,
+	}
 	if v, err = newj.getIntValue(values, "main_heading", 0); err != nil {
 		return err
 	}
@@ -111,7 +142,7 @@ func (j *Jumprun) SetFromURLValues(values url.Values) error {
 	}
 	newj.OffsetDistance = v
 
-	for i := 0; i < len(j.HookTurns); i++ {
+	for i := 0; i < len(newj.HookTurns); i++ {
 		var turn JumprunTurn
 		key := fmt.Sprintf("hook_heading_%d", i)
 		value := values.Get(key)
@@ -138,41 +169,38 @@ func (j *Jumprun) SetFromURLValues(values url.Values) error {
 
 	j.lock.Lock()
 	defer j.lock.Unlock()
-	j.TimeStamp = time.Now().Unix()
-	j.Heading = newj.Heading
-	j.ExitDistance = newj.ExitDistance
-	j.HookTurns = newj.HookTurns
+	j.jumprun = newj
 	j.updateStaticData()
 
 	return nil
 }
 
-func (j *Jumprun) updateStaticData() {
-	modtime := time.Unix(j.TimeStamp, 0)
-	content, _ := json.Marshal(j)
+func (j *JumprunManager) updateStaticData() {
 	if j.updateFunc != nil {
-		j.updateFunc(content, mimetypeJSON, modtime)
+		j.updateFunc(j.jumprun)
 	}
 }
 
-func (j *Jumprun) restore() error {
+func (j *JumprunManager) restore() error {
 	dataBytes, err := ioutil.ReadFile(j.stateFilename)
 	if err != nil {
 		return err
 	}
 
-	if err = json.Unmarshal(dataBytes, j); err != nil {
+	var newj Jumprun
+	if err = json.Unmarshal(dataBytes, &newj); err != nil {
 		return err
 	}
+	j.jumprun = newj
 
 	j.updateStaticData()
 	return nil
 }
 
-func (j *Jumprun) Write() error {
+func (j *JumprunManager) Write() error {
 	j.lock.Lock()
 	defer j.lock.Unlock()
-	dataBytes, err := json.Marshal(j)
+	dataBytes, err := json.Marshal(&j.jumprun)
 	if err != nil {
 		return err
 	}
@@ -184,7 +212,7 @@ func (j *Jumprun) Write() error {
 	return err
 }
 
-func (j *Jumprun) initializeTemplate() *template.Template {
+func (j *JumprunManager) initializeTemplate() *template.Template {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
@@ -201,7 +229,7 @@ func (j *Jumprun) initializeTemplate() *template.Template {
 	return j.template
 }
 
-func (j *Jumprun) HTML(w http.ResponseWriter, req *http.Request) {
+func (j *JumprunManager) HTML(w http.ResponseWriter, req *http.Request) {
 	tmpl := j.initializeTemplate()
 	if tmpl == nil {
 		http.NotFound(w, req)
@@ -209,7 +237,7 @@ func (j *Jumprun) HTML(w http.ResponseWriter, req *http.Request) {
 	}
 
 	b := &bytes.Buffer{}
-	if err := tmpl.Execute(b, j); err != nil {
+	if err := tmpl.Execute(b, &j.jumprun); err != nil {
 		http.NotFound(w, req)
 		return
 	}

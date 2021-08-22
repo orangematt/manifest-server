@@ -40,7 +40,7 @@ var (
 	config     *viper.Viper
 	dzLocation *time.Location
 	settings   *Settings
-	jumprun    *Jumprun
+	jumprun    *JumprunManager
 	webServer  *WebServer
 
 	metarSource      *METAR
@@ -229,7 +229,7 @@ func updateManifestStaticData() {
 		sunrise, _, err := sunriseAndSunsetTimes()
 		if err == nil {
 			dzTimeNow := currentTime()
-			activeJumprunTime := time.Unix(jumprun.TimeStamp, 0).In(dzLocation)
+			activeJumprunTime := time.Unix(jumprun.Jumprun().TimeStamp, 0).In(dzLocation)
 			if activeJumprunTime.Before(sunrise) && dzTimeNow.After(sunrise) {
 				jumprun.Reset()
 				if err = jumprun.Write(); err != nil {
@@ -538,8 +538,15 @@ func main() {
 				data = bytes.Split(data, []byte{'\n'})[0]
 				data = bytes.TrimSpace(data)
 				messageLock.Lock()
-				message = string(data)
+				update := false
+				if newMessage := string(data); newMessage != message {
+					message = newMessage
+					update = true
+				}
 				messageLock.Unlock()
+				if update {
+					updateManifestStaticData()
+				}
 			}
 			select {
 			case <-messageTimer.C:
@@ -554,12 +561,17 @@ func main() {
 		config.SetDefault("jumprun.latitude", "42.5700")
 		config.SetDefault("jumprun.longitude", "-72.2885")
 		config.SetDefault("jumprun.state_file", "/var/lib/manifest-server/jumprun.json")
-		jumprun = NewJumprun(config.GetString("jumprun.state_file"),
+		jumprun = NewJumprunManager(config.GetString("jumprun.state_file"),
 			config.GetString("jumprun.latitude"),
 			config.GetString("jumprun.longitude"),
-			func(content []byte, contentType string, modifyTime time.Time) {
-				webServer.SetContentWithTime("/jumprun.json",
-					content, contentType, modifyTime)
+			func(j Jumprun) {
+				modifyTime := time.Unix(j.TimeStamp, 0)
+				webServer.SetContentWithTime("/jumprun",
+					j.LegacyContent(), mimetypePlain, modifyTime)
+				if jsonContent, err := json.Marshal(j); err != nil {
+					webServer.SetContentWithTime("/jumprun.json",
+						jsonContent, mimetypeJSON, modifyTime)
+				}
 			})
 		webServer.SetContentFunc("/jumprun.html", jumprun.HTML)
 	}
