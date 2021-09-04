@@ -1,6 +1,6 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package winds
 
 import (
 	"encoding/json"
@@ -11,24 +11,17 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/orangematt/manifest-server/pkg/decode"
+	"github.com/orangematt/manifest-server/pkg/settings"
 )
 
-// WindsAloftSample represents a wind sample, which is composed of direction
-// (degrees relative to true north), speed (knots), and temperature (Celsius)
-type WindsAloftSample struct {
-	Altitude         int  `json:"altitude"`
-	Heading          int  `json:"heading"`
-	Speed            int  `json:"speed"`
-	Temperature      int  `json:"temperature"`
-	LightAndVariable bool `json:"is_variable,omitempty"`
-}
+type Controller struct {
+	settings *settings.Settings
 
-// WindsAloft contains all of the information parsed from an NWS winds aloft
-// report.
-type WindsAloft struct {
 	// samples is a simple array of information for each altitude from 0 to
 	// len(Samples) * 1000 feet. Each index position is 1000 feet.
-	samples []WindsAloftSample
+	samples []Sample
 
 	// validTime is the time at which the sample data becomes valid. It's
 	// valid for an hour.
@@ -42,9 +35,11 @@ type WindsAloft struct {
 
 const windsAloftURL = "https://markschulze.net/winds/winds.php?hourOffset=0"
 
-// NewWindsAloft creates a new WindsAloft instance to track winds aloft data.
-func NewWindsAloft(latitude, longitude string) *WindsAloft {
-	wa := &WindsAloft{
+func NewController(settings *settings.Settings) *Controller {
+	latitude := settings.WindsLatitude()
+	longitude := settings.WindsLongitude()
+	wa := &Controller{
+		settings: settings,
 		url: fmt.Sprintf("%s&lat=%s&lon=%s", windsAloftURL, latitude,
 			longitude),
 	}
@@ -52,13 +47,11 @@ func NewWindsAloft(latitude, longitude string) *WindsAloft {
 	return wa
 }
 
-// Refresh retrieves and parses winds aloft data.
-func (wa *WindsAloft) Refresh() error {
-	request, err := http.NewRequest(http.MethodGet, wa.url, nil)
+func (c *Controller) Refresh() error {
+	request, err := c.settings.NewHTTPRequest(http.MethodGet, c.url, nil)
 	if err != nil {
 		return err
 	}
-	setRequestDefaults(request)
 	request.Header.Set("Referer", "https://markschulze.net/winds/")
 
 	resp, err := http.DefaultClient.Do(request)
@@ -88,7 +81,7 @@ func (wa *WindsAloft) Refresh() error {
 	}
 
 	now := time.Now()
-	validHour := int(decodeInt("validtime", windsAloftData["validtime"]))
+	validHour := int(decode.Int("validtime", windsAloftData["validtime"]))
 	validTime := time.Date(now.Year(), now.Month(), now.Day(),
 		validHour, 0, 0, 0, time.UTC)
 	if validHour < now.Hour() {
@@ -120,41 +113,34 @@ func (wa *WindsAloft) Refresh() error {
 		maxAltitude = len(speed)
 	}
 
-	samples := make([]WindsAloftSample, maxAltitude)
+	samples := make([]Sample, maxAltitude)
 	for i := 0; i < maxAltitude; i++ {
 		key := strconv.FormatInt(int64(i*1000), 10)
 		samples[i].Altitude = i * 1000
-		samples[i].Heading = int(decodeInt(key, direction[key]))
-		samples[i].Speed = int(decodeInt(key, speed[key]))
-		samples[i].Temperature = int(decodeInt(key, temp[key]))
+		samples[i].Heading = int(decode.Int(key, direction[key]))
+		samples[i].Speed = int(decode.Int(key, speed[key]))
+		samples[i].Temperature = int(decode.Int(key, temp[key]))
 		samples[i].LightAndVariable = (samples[i].Speed <= 0)
 	}
 
-	wa.lock.Lock()
-	wa.samples = samples
-	wa.validTime = validTime
-	wa.lock.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.samples = samples
+	c.validTime = validTime
 
 	return nil
 }
 
 // Samples returns the samples most recently loaded from the data source.
-func (wa *WindsAloft) Samples() []WindsAloftSample {
-	wa.lock.Lock()
-
-	var samples []WindsAloftSample
-	if len(wa.samples) > 0 {
-		samples = append(samples, wa.samples...)
-	}
-
-	wa.lock.Unlock()
-	return samples
+func (c *Controller) Samples() []Sample {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.samples
 }
 
 // ValidTime returns the time that the samples are valid until.
-func (wa *WindsAloft) ValidTime() time.Time {
-	wa.lock.Lock()
-	validTime := wa.validTime
-	wa.lock.Unlock()
-	return validTime
+func (c *Controller) ValidTime() time.Time {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.validTime
 }

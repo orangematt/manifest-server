@@ -1,6 +1,6 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package server
 
 import (
 	"bytes"
@@ -9,10 +9,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/orangematt/manifest-server/pkg/core"
 )
 
 const (
@@ -37,14 +38,18 @@ type WebServer struct {
 	certFile string
 	keyFile  string
 
+	app *core.Controller
+
 	lock    sync.Mutex
 	content map[string]WebContent
 }
 
 func NewWebServer(
+	controller *core.Controller,
 	httpAddress, httpsAddress, certFile, keyFile string,
-) (*WebServer, error) {
+) *WebServer {
 	s := &WebServer{
+		app:      controller,
 		certFile: certFile,
 		keyFile:  keyFile,
 		content:  make(map[string]WebContent),
@@ -113,7 +118,7 @@ func NewWebServer(
 		}
 	}
 
-	return s, nil
+	return s
 }
 
 func (s *WebServer) Start() error {
@@ -199,51 +204,22 @@ func (s *WebServer) ContentModifyTime(path string) (time.Time, bool) {
 	return time.Now(), false
 }
 
-func parseBool(s string) bool {
-	s = strings.ToLower(s)
-	return s == "on" || s == "true" || s == "t" || s == "y" || s == "yes" || s == "1"
-}
-
 func (s *WebServer) requestHandler(w http.ResponseWriter, req *http.Request) {
 	h := w.Header()
-	switch req.URL.Path {
-	case "/setjumprun":
-		if jumprun == nil {
-			http.NotFound(w, req)
-			return
-		}
-		if err := req.ParseForm(); err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		if err := jumprun.SetFromURLValues(req.Form); err == nil {
-			_ = jumprun.Write()
-		}
+	path := strings.TrimPrefix(req.URL.Path, "/")
 
-	case "/setconfig":
-		if err := req.ParseForm(); err != nil {
-			fmt.Fprintf(os.Stderr, "cannot parse form: %v\n", err)
-			http.NotFound(w, req)
-			return
-		}
-		if settings.SetFromURLValues(req.Form) {
-			_ = settings.Write()
-		}
+	s.lock.Lock()
+	content, ok := s.content[path]
+	s.lock.Unlock()
 
-	default:
-		path := strings.TrimPrefix(req.URL.Path, "/")
-		s.lock.Lock()
-		content, ok := s.content[path]
-		s.lock.Unlock()
-		if !ok {
-			h.Set("Connection", "close")
-			http.NotFound(w, req)
-		} else if content.Func != nil {
-			content.Func(w, req)
-		} else {
-			h.Set("Content-Type", content.ContentType)
-			http.ServeContent(w, req, "", content.ModifyTime,
-				bytes.NewReader(content.Content))
-		}
+	if !ok {
+		h.Set("Connection", "close")
+		http.NotFound(w, req)
+	} else if content.Func != nil {
+		content.Func(w, req)
+	} else {
+		h.Set("Content-Type", content.ContentType)
+		http.ServeContent(w, req, "", content.ModifyTime,
+			bytes.NewReader(content.Content))
 	}
 }

@@ -1,18 +1,27 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package settings
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/spf13/viper"
 )
+
+func ParseBool(s string) bool {
+	s = strings.ToLower(s)
+	return s == "on" || s == "true" || s == "t" || s == "y" || s == "yes" || s == "1"
+}
 
 // Settings are configurable options that may be changed via the web interface
 // while the server is running.
@@ -26,32 +35,69 @@ type Settings struct {
 	template *template.Template
 }
 
-func NewSettings(v *viper.Viper) *Settings {
-	s := &Settings{}
-	s.config = v
+func NewSettings() (*Settings, error) {
+	s := &Settings{
+		config: viper.New(),
+	}
 
-	config.SetDefault("display_nicknames", true)
-	s.DisplayNicknames = config.GetBool("display_nicknames")
-	config.SetDefault("display_weather", true)
-	s.DisplayWeather = config.GetBool("display_weather")
-	config.SetDefault("display_winds", true)
-	s.DisplayWinds = config.GetBool("display_winds")
+	for key, value := range defaults {
+		v := reflect.ValueOf(value)
+		switch v.Kind() {
+		case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+			if v.IsNil() {
+				continue
+			}
+			fallthrough
+		default:
+			s.config.SetDefault(key, value)
+		}
+	}
 
-	return s
+	s.config.AddConfigPath("/etc/manifest-server")
+	s.config.AddConfigPath("$HOME/.manifest-server")
+	s.config.AddConfigPath(".")
+	if err := s.config.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("Could not read config: %w\n", err)
+	}
+
+	return s, nil
 }
 
 func (s *Settings) Write() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	config.Set("display_nicknames", s.DisplayNicknames)
-	config.Set("display_weather", s.DisplayWeather)
-	config.Set("display_winds", s.DisplayWinds)
+	s.config.Set("display_nicknames", s.DisplayNicknames)
+	s.config.Set("display_weather", s.DisplayWeather)
+	s.config.Set("display_winds", s.DisplayWinds)
 
-	if err := config.WriteConfig(); err != nil {
+	if err := s.config.WriteConfig(); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (s *Settings) NewHTTPRequest(
+	method string,
+	url string,
+	body io.Reader,
+) (*http.Request, error) {
+	request, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.0.3 Safari/605.1.15")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	return request, err
+}
+
+func (s *Settings) Location() (*time.Location, error) {
+	timezone := s.config.GetString("timezone")
+	return time.LoadLocation(timezone)
+}
+
+func (s *Settings) MessageFile() string {
+	return s.config.GetString("message_file")
 }
 
 func (s *Settings) SetFromURLValues(values url.Values) bool {
@@ -65,7 +111,7 @@ func (s *Settings) SetFromURLValues(values url.Values) bool {
 		switch fv.Kind() {
 		case reflect.Bool:
 			o := fv.Bool()
-			n := parseBool(v[0])
+			n := ParseBool(v[0])
 			if o != n {
 				changed = true
 				fv.SetBool(n)
@@ -104,9 +150,20 @@ func (s *Settings) HTML(w http.ResponseWriter, req *http.Request) {
 		http.NotFound(w, req)
 		return
 	}
-	w.Header().Set("Content-Type", mimetypeHTML)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	r := bytes.NewReader(b.Bytes())
 	http.ServeContent(w, req, "", time.Now(), r)
+}
+
+func (s *Settings) FormHandler(w http.ResponseWriter, req *http.Request) {
+	if err := req.ParseForm(); err != nil {
+		fmt.Fprintf(os.Stderr, "cannot parse form: %v\n", err)
+		http.NotFound(w, req)
+		return
+	}
+	if s.SetFromURLValues(req.Form) {
+		_ = s.Write()
+	}
 }
 
 const settingsHTML = `<html>

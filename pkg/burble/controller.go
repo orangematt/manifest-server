@@ -1,6 +1,6 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package burble
 
 import (
 	"bytes"
@@ -12,6 +12,9 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/orangematt/manifest-server/pkg/decode"
+	"github.com/orangematt/manifest-server/pkg/settings"
 )
 
 const (
@@ -21,93 +24,32 @@ const (
 	burbleNumColumns  = 6 // # columns to ask Burble for
 )
 
-// BurbleJumper represents a jumper
-type BurbleJumper struct {
-	ID             int64           `json:"id"`
-	Name           string          `json:"name"`
-	Nickname       string          `json:"nickname"`
-	ShortName      string          `json:"short_name"`
-	IsInstructor   bool            `json:"is_instructor"`
-	IsTandem       bool            `json:"is_tandem"`
-	IsStudent      bool            `json:"is_student"`
-	IsVideographer bool            `json:"is_videographer"`
-	GroupMembers   []*BurbleJumper `json:"group_members"`
-}
-
-// NewBurbleJumper creates a new representation of a jumper
-func NewBurbleJumper(id int64, name, nickname, shortName string) *BurbleJumper {
-	j := &BurbleJumper{
-		ID:        id,
-		Name:      strings.TrimSpace(name),
-		Nickname:  strings.TrimSpace(nickname),
-		ShortName: strings.TrimSpace(shortName),
-	}
-
-	if strings.HasPrefix(strings.ToLower(j.Name), "jm ") {
-		j.Name = strings.TrimSpace(j.Name[3:])
-	}
-	if strings.HasPrefix(strings.ToLower(j.Nickname), "jm ") {
-		j.Nickname = strings.TrimSpace(j.Nickname[3:])
-	}
-	if strings.ToLower(j.ShortName) == "vs" {
-		j.ShortName = "Video"
-		j.IsVideographer = true
-	}
-
-	return j
-}
-
-// AddGroupMember adds a jumper to a group of jumpers
-func (j *BurbleJumper) AddGroupMember(member *BurbleJumper) {
-	j.GroupMembers = append(j.GroupMembers, member)
-	if (j.IsTandem || j.IsStudent) && !member.IsVideographer {
-		member.IsInstructor = true
-	}
-}
-
-// BurbleLoad represents a load
-type BurbleLoad struct {
-	ID             int64           `json:"id"`
-	AircraftName   string          `json:"aircraft_name"`
-	IsFueling      bool            `json:"is_fueling"`
-	IsTurning      bool            `json:"is_turning"`
-	IsNoTime       bool            `json:"is_no_time"`
-	SlotsAvailable int64           `json:"slots_available"`
-	CallMinutes    int64           `json:"call_minutes"`
-	LoadNumber     string          `json:"load_number"`
-	Tandems        []*BurbleJumper `json:"tandems"`
-	Students       []*BurbleJumper `json:"students"`
-	SportJumpers   []*BurbleJumper `json:"sport_jumpers"`
-}
-
-// Burble encapsulates data retrieved from Burble for a dropzone
-type Burble struct {
-	dropZoneID  int
+type Controller struct {
+	settings    *settings.Settings
 	columnCount int
-	loads       []*BurbleLoad
+	loads       []*Load
 
 	lock sync.Mutex
 }
 
-// NewBurble creates a new Burble data source with the specified dropzone ID.
-func NewBurble(dropZoneID int) *Burble {
-	return &Burble{
-		dropZoneID: dropZoneID,
+func NewController(settings *settings.Settings) *Controller {
+	return &Controller{
+		settings: settings,
 	}
 }
 
 // RefreshCookies makes a throw-away request to get cookies from Burble so that
 // data refreshes will work.
-func (b *Burble) RefreshCookies() error {
+func (c *Controller) RefreshCookies() error {
 	// Create and use our own request rather than use http.DefaultClient.Get
 	// so that we can keep up the charade that we're a browser and not a
 	// server app scraping data!
-	urlWithDZID := fmt.Sprintf("%s?dz_id=%d", burblePublicURL, b.dropZoneID)
-	request, err := http.NewRequest(http.MethodPost, urlWithDZID, nil)
+	dzid := c.settings.BurbleDropzoneID()
+	urlWithDZID := fmt.Sprintf("%s?dz_id=%d", burblePublicURL, dzid)
+	request, err := c.settings.NewHTTPRequest(http.MethodPost, urlWithDZID, nil)
 	if err != nil {
 		return err
 	}
-	setRequestDefaults(request)
 
 	if _, err = http.DefaultClient.Do(request); err != nil {
 		return err
@@ -120,25 +62,25 @@ func (b *Burble) RefreshCookies() error {
 }
 
 // Refresh retrieves new data from Burble
-func (b *Burble) Refresh() error {
+func (c *Controller) Refresh() error {
 	u, err := url.Parse(burbleManifestURL)
 	if err != nil {
 		return err
 	}
 	if len(http.DefaultClient.Jar.Cookies(u)) == 0 {
-		if err = b.RefreshCookies(); err != nil {
+		if err = c.RefreshCookies(); err != nil {
 			return err
 		}
 	}
 
-	bodyString := fmt.Sprintf("aircraft=0&columns=%d&display_tandem=1&display_student=1&display_sport=1&display_menu=0&font_size=0&action=getLoads&dz_id=%d&date_format=m%%2Fd%%2FY&acl_application=Burble%%20DZM", burbleNumColumns, b.dropZoneID)
+	dzid := c.settings.BurbleDropzoneID()
+	bodyString := fmt.Sprintf("aircraft=0&columns=%d&display_tandem=1&display_student=1&display_sport=1&display_menu=0&font_size=0&action=getLoads&dz_id=%d&date_format=m%%2Fd%%2FY&acl_application=Burble%%20DZM", burbleNumColumns, dzid)
 	body := bytes.NewReader([]byte(bodyString))
 
-	request, err := http.NewRequest(http.MethodPost, burbleManifestURL, body)
+	request, err := c.settings.NewHTTPRequest(http.MethodPost, burbleManifestURL, body)
 	if err != nil {
 		return err
 	}
-	setRequestDefaults(request)
 	request.Header.Set("Origin", burbleBaseURL)
 	request.Header.Set("Referer", burblePublicURL)
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
@@ -164,7 +106,7 @@ func (b *Burble) Refresh() error {
 		return err
 	}
 
-	var loads []*BurbleLoad
+	var loads []*Load
 	burbleData := rawBurbleData.(map[string]interface{})
 	if _, ok := burbleData["loads"]; !ok {
 		return errors.New("Burble data is missing load information")
@@ -179,16 +121,16 @@ func (b *Burble) Refresh() error {
 		}
 
 		// Ignore loads that are not public
-		if !decodeBool("is_public", loadData["is_public"]) {
+		if !decode.Bool("is_public", loadData["is_public"]) {
 			continue
 		}
 
-		l := BurbleLoad{
-			ID:           decodeInt("id", loadData["id"]),
+		l := Load{
+			ID:           decode.Int("id", loadData["id"]),
 			AircraftName: loadData["aircraft_name"].(string),
-			IsFueling:    decodeBool("is_fueling", loadData["is_fueling"]),
-			IsTurning:    decodeBool("is_turning", loadData["is_turning"]),
-			CallMinutes:  decodeInt("time_left", loadData["time_left"]),
+			IsFueling:    decode.Bool("is_fueling", loadData["is_fueling"]),
+			IsTurning:    decode.Bool("is_turning", loadData["is_turning"]),
+			CallMinutes:  decode.Int("time_left", loadData["time_left"]),
 		}
 		if l.CallMinutes >= 120 {
 			l.IsNoTime = true
@@ -206,8 +148,8 @@ func (b *Burble) Refresh() error {
 		// our own computation has continued to work and I'm feeling
 		// more trusting of it given the troubled history here.
 		var privateSlots, publicSlots int64
-		maxSlots := decodeInt("max_slots", loadData["max_slots"])
-		reserveSlots := decodeInt("reserve_slots", loadData["reserve_slots"])
+		maxSlots := decode.Int("max_slots", loadData["max_slots"])
+		reserveSlots := decode.Int("reserve_slots", loadData["reserve_slots"])
 
 		groups := loadData["groups"].([]interface{})
 		for _, rawGroupData := range groups {
@@ -216,8 +158,8 @@ func (b *Burble) Refresh() error {
 			name = memberData["first_name"].(string) + " " +
 				memberData["last_name"].(string)
 			nickname := memberData["name"].(string)
-			primaryID := decodeInt("id", memberData["id"])
-			primaryJumper := NewBurbleJumper(
+			primaryID := decode.Int("id", memberData["id"])
+			primaryJumper := NewJumper(
 				primaryID,
 				name,
 				nickname,
@@ -235,9 +177,9 @@ func (b *Burble) Refresh() error {
 			for i, rawMemberData := range members {
 				memberData = rawMemberData.(map[string]interface{})
 				switch {
-				case decodeBool("is_public", memberData["is_public"]):
+				case decode.Bool("is_public", memberData["is_public"]):
 					publicSlots++
-				case decodeBool("is_private", memberData["is_private"]):
+				case decode.Bool("is_private", memberData["is_private"]):
 					privateSlots++
 				}
 				if i < 1 {
@@ -251,8 +193,8 @@ func (b *Burble) Refresh() error {
 				} else {
 					nickname = memberData["name"].(string)
 				}
-				id := decodeInt("id", memberData["id"])
-				jumper := NewBurbleJumper(id, name, nickname,
+				id := decode.Int("id", memberData["id"])
+				jumper := NewJumper(id, name, nickname,
 					memberData["short_name"].(string))
 				if _, ok = memberData["handycam_jump"].(string); ok {
 					jumper.ShortName = "Handycam"
@@ -277,24 +219,22 @@ func (b *Burble) Refresh() error {
 		loads = append(loads, &l)
 	}
 
-	b.lock.Lock()
-	b.columnCount = columnCount
-	b.loads = loads
-	b.lock.Unlock()
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.columnCount = columnCount
+	c.loads = loads
 
 	return nil
 }
 
-func (b *Burble) Loads() []*BurbleLoad {
-	b.lock.Lock()
-	loads := b.loads
-	b.lock.Unlock()
-	return loads
+func (c *Controller) Loads() []*Load {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.loads
 }
 
-func (b *Burble) ColumnCount() int {
-	b.lock.Lock()
-	columnCount := b.columnCount
-	b.lock.Unlock()
-	return columnCount
+func (c *Controller) ColumnCount() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.columnCount
 }

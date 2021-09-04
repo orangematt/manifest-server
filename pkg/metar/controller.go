@@ -1,6 +1,6 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package metar
 
 import (
 	"errors"
@@ -123,24 +123,17 @@ func weatherCondition(wx string) string {
 	return strings.Join(results, ", ")
 }
 
-// METAR is a structure containing reported weather information for a station.
-type METAR struct {
-	// station is the weather station for this METAR.
+type Controller struct {
 	station string
 
-	// fields is the raw data parsed into fields.
-	fields map[string]interface{}
-
+	lock        sync.Mutex
+	fields      map[string]interface{}
 	skyCover    string
 	wxCondition string
-
-	lock sync.Mutex
 }
 
-// NewMETAR creates a new METAR instance to track weather reports from the
-// specified station.
-func NewMETAR(station string) *METAR {
-	return &METAR{
+func NewController(station string) *Controller {
+	return &Controller{
 		station: station,
 	}
 }
@@ -148,8 +141,8 @@ func NewMETAR(station string) *METAR {
 const metarURL = "https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=csv&hoursBeforeNow=24&mostRecent=true"
 
 // Refresh retrieves and parses weather data.
-func (m *METAR) Refresh() error {
-	url := fmt.Sprintf("%s&stationString=%s", metarURL, m.station)
+func (c *Controller) Refresh() error {
+	url := fmt.Sprintf("%s&stationString=%s", metarURL, c.station)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -244,27 +237,27 @@ func (m *METAR) Refresh() error {
 		}
 	}
 
-	m.lock.Lock()
-	m.fields = parsedFields
+	c.lock.Lock()
+	c.fields = parsedFields
 	if len(highClouds) > 0 {
-		m.skyCover = strings.Join(highClouds, ", ")
+		c.skyCover = strings.Join(highClouds, ", ")
 	} else if len(lowClouds) > 0 {
-		m.skyCover = strings.Join(lowClouds, ", ")
+		c.skyCover = strings.Join(lowClouds, ", ")
 	} else {
-		m.skyCover = "clear"
+		c.skyCover = "clear"
 	}
-	m.wxCondition = wxCondition
-	m.lock.Unlock()
+	c.wxCondition = wxCondition
+	c.lock.Unlock()
 
 	return nil
 }
 
 // WindSpeedMPH returns the current wind speed in MPH.
-func (m *METAR) WindSpeedMPH() float64 {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (c *Controller) WindSpeedMPH() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	var speed float64
-	switch v := m.fields["wind_speed_kt"].(type) {
+	switch v := c.fields["wind_speed_kt"].(type) {
 	case float64:
 		speed = v
 	case int64:
@@ -276,11 +269,11 @@ func (m *METAR) WindSpeedMPH() float64 {
 }
 
 // WindGustSpeedMPH returns current wind gust speed in MPH.
-func (m *METAR) WindGustSpeedMPH() float64 {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (c *Controller) WindGustSpeedMPH() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	var gusting float64
-	switch v := m.fields["wind_gust_kt"].(type) {
+	switch v := c.fields["wind_gust_kt"].(type) {
 	case float64:
 		gusting = v
 	case int64:
@@ -292,11 +285,11 @@ func (m *METAR) WindGustSpeedMPH() float64 {
 }
 
 // WindDirectionDegrees returns the current wind direction in degrees.
-func (m *METAR) WindDirectionDegrees() float64 {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (c *Controller) WindDirectionDegrees() float64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	var windDirectionDegrees float64
-	switch v := m.fields["wind_dir_degrees"].(type) {
+	switch v := c.fields["wind_dir_degrees"].(type) {
 	case float64:
 		windDirectionDegrees = v
 	case int64:
@@ -309,16 +302,16 @@ func (m *METAR) WindDirectionDegrees() float64 {
 }
 
 // WindConditions returns the current wind conditions as a human-readable string.
-func (m *METAR) WindConditions() string {
-	speed := m.WindSpeedMPH()
+func (c *Controller) WindConditions() string {
+	speed := c.WindSpeedMPH()
 	if speed <= 0 {
 		return "light and variable"
 	}
 
-	windDirectionDegrees := m.WindDirectionDegrees()
+	windDirectionDegrees := c.WindDirectionDegrees()
 	windDirection := CardinalDirection(windDirectionDegrees)
 
-	gusting := m.WindGustSpeedMPH()
+	gusting := c.WindGustSpeedMPH()
 	if gusting > 0 {
 		return fmt.Sprintf("%d MPH gusting to %d MPH from %d° (%s)",
 			int64(speed), int64(gusting),
@@ -330,31 +323,31 @@ func (m *METAR) WindConditions() string {
 
 // WeatherConditions returns a human-readable description of current weather
 // conditions (raining, snowing, clear, etc.)
-func (m *METAR) WeatherConditions() string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	if m.wxCondition == "" {
+func (c *Controller) WeatherConditions() string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.wxCondition == "" {
 		return "data error"
 	}
-	return m.wxCondition
+	return c.wxCondition
 }
 
 // SkyCover returns a human-readable description of the current sky cover.
-func (m *METAR) SkyCover() string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	if m.skyCover == "" {
+func (c *Controller) SkyCover() string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.skyCover == "" {
 		return "data error"
 	}
-	return m.skyCover
+	return c.skyCover
 }
 
 // TemperatureString returns a human-readable temperature string
-func (m *METAR) TemperatureString() string {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+func (c *Controller) TemperatureString() string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	var temp float64
-	switch v := m.fields["temp_c"].(type) {
+	switch v := c.fields["temp_c"].(type) {
 	case float64:
 		temp = v
 	case int64:
@@ -367,14 +360,14 @@ func (m *METAR) TemperatureString() string {
 		int64(temp), int64(FahrenheitFromCelsius(temp)))
 }
 
-func (m *METAR) Location() (float64, float64, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	latitude, ok := m.fields["latitude"].(float64)
+func (c *Controller) Location() (float64, float64, bool) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	latitude, ok := c.fields["latitude"].(float64)
 	if !ok {
 		return 0, 0, false
 	}
-	longitude, ok := m.fields["longitude"].(float64)
+	longitude, ok := c.fields["longitude"].(float64)
 	if !ok {
 		return 0, 0, false
 	}

@@ -1,19 +1,19 @@
-// (c) Copyright 2017-2020 Matt Messier
+// (c) Copyright 2017-2021 Matt Messier
 
-package main
+package decode
 
 import (
 	"strconv"
 )
 
-// decodeBool decodes a JSON encoded bool
-func decodeBool(s string, i interface{}) bool {
+// Bool decodes a JSON encoded bool
+func Bool(s string, i interface{}) bool {
 	switch v := i.(type) {
 	case bool:
 		return v
 	case string:
 		if x, err := strconv.ParseBool(v); err == nil {
-			//fmt.Printf("decodeBool(%q: %#v %T)\n", s, v, v)
+			//fmt.Printf("decode.Bool(%q: %#v %T)\n", s, v, v)
 			return x
 		}
 		return false
@@ -22,13 +22,13 @@ func decodeBool(s string, i interface{}) bool {
 	case float64:
 		return v != 0.0
 	default:
-		//fmt.Printf("decodeBool(%q: %#v %T)\n", s, v, v)
+		//fmt.Printf("decode.Bool(%q: %#v %T)\n", s, v, v)
 		return false
 	}
 }
 
-// decodeInt decodes a JSON encoded signed integer
-func decodeInt(s string, i interface{}) int64 {
+// Int decodes a JSON encoded signed integer
+func Int(s string, i interface{}) int64 {
 	switch v := i.(type) {
 	case bool:
 		if v {
@@ -37,7 +37,7 @@ func decodeInt(s string, i interface{}) int64 {
 		return 0
 	case string:
 		if x, err := strconv.ParseInt(v, 0, 64); err == nil {
-			//fmt.Printf("decodeInt(%q: %#v %T)\n", s, v, v)
+			//fmt.Printf("decode.Int(%q: %#v %T)\n", s, v, v)
 			return x
 		}
 		return 0
@@ -46,7 +46,7 @@ func decodeInt(s string, i interface{}) int64 {
 	case float64:
 		return int64(v)
 	default:
-		//fmt.Printf("decodeInt(%q: %#v %T)\n", s, v, v)
+		//fmt.Printf("decode.Int(%q: %#v %T)\n", s, v, v)
 		return 0
 	}
 }
