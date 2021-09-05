@@ -1,10 +1,5 @@
 timezone: America/New_York
-
-display_nicknames: true
-display_weather: true
-display_winds: true
-
-message_file: /var/lib/manifest-server/message
+options_file: /var/lib/manifest-server/options.json
 
 server:
   http_address: ":8080"
@@ -27,4 +22,4 @@ jumprun:
   enabled: true
   latitude: 42.5700
   longitude: -72.2885
-  state_file: /var/lib/manifest-server/jumprun.state
+  state_file: /var/lib/manifest-server/jumprun.json

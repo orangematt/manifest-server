@@ -3,11 +3,8 @@
 package settings
 
 var defaults = map[string]interface{}{
-	"display_nicknames": true,
-	"display_weather":   true,
-	"winds":             true,
-	"message_file":      "/var/lib/manifest-server/message",
-	"timezone":          "America/New_York",
+	"options_file": "/var/lib/manifest-server/options.json",
+	"timezone":     "America/New_York",
 
 	"server.http_address":  ":http",
 	"server.https_address": ":https",
@@ -27,4 +24,10 @@ var defaults = map[string]interface{}{
 	"winds.enabled":   true,
 	"winds.latitude":  "42.5700",
 	"winds.longitude": "-72.2885",
+}
+
+var defaultOptions = Options{
+	DisplayNicknames: true,
+	DisplayWeather:   true,
+	DisplayWinds:     true,
 }

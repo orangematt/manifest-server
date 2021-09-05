@@ -119,8 +119,7 @@ func (s *WebServer) addToManifest(slots []string, jumper *burble.Jumper) []strin
 }
 
 func (s *WebServer) messageString() string {
-	message := s.app.Message()
-	if message != "" {
+	if message := s.app.Settings().Message(); message != "" {
 		return message
 	}
 
@@ -297,9 +296,10 @@ func (s *WebServer) updateManifestStaticData() {
 			if t := m.WindsTime; t != "" {
 				h.Set("X-Winds-Time", t)
 			}
-			h.Set("X-Display-Weather", strconv.FormatBool(settings.DisplayWeather))
-			h.Set("X-Display-Winds", strconv.FormatBool(settings.DisplayWinds))
-			h.Set("X-Display-Nicknames", strconv.FormatBool(settings.DisplayNicknames))
+			o := settings.Options()
+			h.Set("X-Display-Weather", strconv.FormatBool(o.DisplayWeather))
+			h.Set("X-Display-Winds", strconv.FormatBool(o.DisplayWinds))
+			h.Set("X-Display-Nicknames", strconv.FormatBool(o.DisplayNicknames))
 			h.Set("X-Column-Count", strconv.FormatInt(int64(m.ColumnCount), 10))
 
 			h.Set("Content-Type", "text/plain; charset=utf-8")

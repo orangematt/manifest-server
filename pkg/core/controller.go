@@ -3,10 +3,8 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -22,10 +20,6 @@ import (
 	"github.com/orangematt/manifest-server/pkg/winds"
 )
 
-const (
-	messageUpdateFrequency = 5 * time.Second
-)
-
 type DataSource uint64
 
 const (
@@ -33,13 +27,12 @@ const (
 	JumprunDataSource               = 1 << 1
 	METARDataSource                 = 2 << 1
 	WindsAloftDataSource            = 3 << 1
-	MessageDataSource               = 4 << 1
+	SettingsDataSource              = 4 << 1
 )
 
 type Controller struct {
 	mutex sync.Mutex
 
-	message          string
 	location         *time.Location
 	burbleSource     *burble.Controller
 	jumprun          *jumprun.Controller
@@ -69,13 +62,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 		func() time.Time { return time.Now().Add(10 * time.Second) },
 		"Burble",
 		c.burbleSource.Refresh,
-		func() { c.wakeupListeners(BurbleDataSource) })
-
-	c.launchDataSource(
-		func() time.Time { return time.Now().Add(messageUpdateFrequency) },
-		"Message",
-		c.refreshMessage,
-		func() { c.wakeupListeners(MessageDataSource) })
+		func() { c.WakeListeners(BurbleDataSource) })
 
 	if c.settings.METAREnabled() {
 		c.metarSource = metar.NewController(c.settings.METARStation())
@@ -83,7 +70,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 			func() time.Time { return time.Now().Add(5 * time.Minute) },
 			"METAR",
 			c.metarSource.Refresh,
-			func() { c.wakeupListeners(METARDataSource) })
+			func() { c.WakeListeners(METARDataSource) })
 	}
 
 	if c.settings.WindsEnabled() {
@@ -92,12 +79,12 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 			func() time.Time { return time.Now().Add(15 * time.Minute) },
 			"Winds Aloft",
 			c.windsAloftSource.Refresh,
-			func() { c.wakeupListeners(WindsAloftDataSource) })
+			func() { c.WakeListeners(WindsAloftDataSource) })
 	}
 
 	if c.settings.JumprunEnabled() {
 		c.jumprun = jumprun.NewController(c.settings,
-			func() { c.wakeupListeners(JumprunDataSource) })
+			func() { c.WakeListeners(JumprunDataSource) })
 	}
 
 	c.wg.Add(1)
@@ -140,12 +127,6 @@ func (c *Controller) METARSource() *metar.Controller {
 
 func (c *Controller) WindsAloftSource() *winds.Controller {
 	return c.windsAloftSource
-}
-
-func (c *Controller) Message() string {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	return c.message
 }
 
 func (c *Controller) CurrentTime() time.Time {
@@ -251,29 +232,12 @@ func (c *Controller) AddListener(l chan DataSource) {
 	c.listeners = append(c.listeners, l)
 }
 
-func (c *Controller) wakeupListeners(source DataSource) {
+func (c *Controller) WakeListeners(source DataSource) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	for _, l := range c.listeners {
 		l <- source
 	}
-}
-
-func (c *Controller) refreshMessage() error {
-	messageDataFile := c.settings.MessageFile()
-	data, err := ioutil.ReadFile(messageDataFile)
-	if err != nil {
-		return err
-	}
-
-	data = bytes.Split(data, []byte{'\n'})[0]
-	data = bytes.TrimSpace(data)
-
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.message = string(data)
-
-	return nil
 }
 
 func (c *Controller) sunrise() {
