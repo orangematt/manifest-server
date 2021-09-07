@@ -17,3 +17,11 @@ func (s *Settings) JumprunLongitude() string {
 func (s *Settings) JumprunStateFile() string {
 	return s.config.GetString("jumprun.state_file")
 }
+
+func (s *Settings) JumprunMagneticDeclination() int {
+	return s.config.GetInt("jumprun.magnetic_declination")
+}
+
+func (s *Settings) JumprunCameraHeight() int {
+	return s.config.GetInt("jumprun.camera_height")
+}

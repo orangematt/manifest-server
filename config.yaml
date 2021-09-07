@@ -22,4 +22,6 @@ jumprun:
   enabled: true
   latitude: 42.5700
   longitude: -72.2885
+  magnetic_declination: -14
+  camera_height: 22000
   state_file: /var/lib/manifest-server/jumprun.json

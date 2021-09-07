@@ -41,11 +41,12 @@ func NewController(
 	}
 	if err := c.restore(); err != nil {
 		fmt.Fprintf(os.Stderr, "cannot restore jumprun state: %v\n", err)
-	} else {
-		latitude := settings.JumprunLatitude()
-		longitude := settings.JumprunLongitude()
-		if c.jumprun.Latitude != latitude || c.jumprun.Longitude != longitude {
-			c.Reset()
+		c.jumprun = Jumprun{
+			TimeStamp:           time.Now().Unix(),
+			Latitude:            settings.JumprunLatitude(),
+			Longitude:           settings.JumprunLongitude(),
+			MagneticDeclination: settings.JumprunMagneticDeclination(),
+			CameraHeight:        settings.JumprunCameraHeight(),
 		}
 	}
 	return c
@@ -59,11 +60,10 @@ func (c *Controller) Jumprun() Jumprun {
 
 func (c *Controller) Reset() {
 	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.jumprun.TimeStamp = time.Now().Unix()
+	c.jumprun.IsSet = false
+	c.lock.Unlock()
 
-	c.jumprun = Jumprun{
-		TimeStamp: time.Now().Unix(),
-	}
 	c.updateStaticData()
 }
 
@@ -72,6 +72,11 @@ func (c *Controller) SetFromURLValues(values url.Values) error {
 		err error
 		v   int
 	)
+
+	c.lock.Lock()
+	latitude := c.jumprun.Latitude
+	longitude := c.jumprun.Longitude
+	c.lock.Unlock()
 
 	newj := Jumprun{
 		TimeStamp: time.Now().Unix(),
@@ -99,6 +104,26 @@ func (c *Controller) SetFromURLValues(values url.Values) error {
 		return err
 	}
 	newj.OffsetDistance = v
+
+	if v, err = newj.getIntValue(values, "magnetic_declination", 0); err != nil {
+		return err
+	}
+	newj.MagneticDeclination = v
+
+	if v, err = newj.getIntValue(values, "camera_height", 0); err != nil {
+		return err
+	}
+	newj.CameraHeight = v
+
+	if latitude, err = newj.getCoordinate(values, "latitude", latitude); err != nil {
+		return err
+	}
+	newj.Latitude = latitude
+
+	if longitude, err = newj.getCoordinate(values, "longitude", longitude); err != nil {
+		return err
+	}
+	newj.Longitude = longitude
 
 	for i := 0; i < len(newj.HookTurns); i++ {
 		var turn Turn
@@ -177,8 +202,19 @@ func (c *Controller) Write() error {
 
 func (c *Controller) initializeTemplate() *template.Template {
 	if c.template == nil {
+		t := template.New("jumprun")
+
+		// These functions are used to reset the origin back to the
+		// configured defaults
+		t = t.Funcs(template.FuncMap{
+			"latitude":             func() string { return c.settings.JumprunLatitude() },
+			"longitude":            func() string { return c.settings.JumprunLongitude() },
+			"magnetic_declination": func() int { return c.settings.JumprunMagneticDeclination() },
+			"camera_height":        func() int { return c.settings.JumprunCameraHeight() },
+		})
+
 		var err error
-		c.template, err = template.New("jumprun").Parse(jumprunHTML)
+		c.template, err = t.Parse(jumprunHTML)
 		if err != nil {
 			// This should never fail -- the HTML is hard-coded, so
 			// panic if this happens, because it means it's an error
@@ -224,6 +260,14 @@ func (c *Controller) FormHandler(w http.ResponseWriter, req *http.Request) {
 const jumprunHTML = `<html>
 	<head>
 		<title>Manifest - Set Jump Run</title>
+		<script>
+		function reset() {
+			document.getElementById("latitude").value = "{{latitude}}";
+			document.getElementById("longitude").value = "{{longitude}}";
+			document.getElementById("magnetic_declination").value = "{{magnetic_declination}}";
+			document.getElementById("camera_height").value = "{{camera_height}}";
+		}
+		</script>
 	</head>
 	<body>
 		<form action="/setjumprun" method="post">
@@ -240,34 +284,58 @@ const jumprunHTML = `<html>
 				<h3>Jump Run</h3>
 			</div>
 			<div>
-				<label>Heading:</label>
-				<input type="text" name="main_heading" value="{{.Heading}}">
-			</div>
-			<div>
-				<label>Exit Distance:<label>
-				<input type="text" name="exit_distance" value="{{.ExitDistance}}">
+				<h4>Origin:</h4>
+				<div>
+					<label>Latitude:</label>
+					<input type="text" id="latitude" name="latitude" value="{{.Latitude}}">
+					<label>Longitude:</label>
+					<input type="text" id="longitude" name="longitude" value="{{.Longitude}}">
+				</div>
+				<div>
+					<label>Magnetic Declination:</label>
+					<input type="text" id="magnetic_declination" name="magnetic_declination" value="{{.MagneticDeclination}}">
+				</div>
+				<div>
+					<label>Camera Height (feet):</label>
+					<input type="text" id="camera_height" name="camera_height" value="{{.CameraHeight}}">
+				</div>
+				<div>
+					<input type="button" value="Reset to Default" onclick="reset();">
+				</div>
 			</div>
 			<div>
 				<h4>Offset:</h4>
-				<label>Heading:</label>
-				<input type="text" name="offset_heading" value="{{.OffsetHeading}}">
-				<label>Distance:</label>
-				<input type="text" name="offset_distance" value="{{.OffsetDistance}}">
+				<div>
+					<label>Heading:</label>
+					<input type="text" name="offset_heading" value="{{.OffsetHeading}}">
+					<label>Distance:</label>
+					<input type="text" name="offset_distance" value="{{.OffsetDistance}}">
+				</div>
 			</div>
 			<div>
-			<hr>
-			<h3>Hook Points</h3>
-			Leave these blank if there is to be no hook.
-			<p>
+				<h4>Run:</h4>
+				<div>
+					<label>Heading:</label>
+					<input type="text" name="main_heading" value="{{.Heading}}">
+				</div>
+				<div>
+					<label>Exit Distance:<label>
+					<input type="text" name="exit_distance" value="{{.ExitDistance}}">
+				</div>
 			</div>
-			{{range $index, $element := .HookTurns}}
 			<div>
-				<label>Distance:<label>
-				<input type="text" name="hook_distance_{{$index}}" value="{{$element.Distance}}">
-				<label>Heading:<label>
-				<input type="text" name="hook_heading_{{$index}}" value="{{$element.Heading}}">
+				<h4>Hook</h4>
+				Leave these blank if there is to be no hook.
+				<p>
+				{{range $index, $element := .HookTurns}}
+				<div>
+					<label>Distance:<label>
+					<input type="text" name="hook_distance_{{$index}}" value="{{$element.Distance}}">
+					<label>Heading:<label>
+					<input type="text" name="hook_heading_{{$index}}" value="{{$element.Heading}}">
+				</div>
+				{{end}}
 			</div>
-			{{end}}
 			<div>
 				<hr>
 				<button type="reset">Reset</button>
