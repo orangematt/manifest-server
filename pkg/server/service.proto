@@ -1,0 +1,115 @@
+syntax = "proto3";
+package manifest;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/orangematt/manifest-server/pkg/server";
+
+message Status {
+	string winds = 1;
+	string clouds = 2;
+	string weather = 3;
+	string separation = 4;
+	string temperature = 5;
+}
+
+message Options {
+	int32 column_count = 1;
+	bool display_nicknames = 2;
+	bool display_weather = 3;
+	bool display_winds = 4;
+	string message = 5;
+}
+
+message JumprunTurn {
+	int32 distance = 1;
+	int32 heading = 2;
+}
+
+message JumprunOrigin {
+	string latitude = 1;
+	string longitude = 2;
+	int32 magnetic_deviation = 3;
+	int32 camera_height = 4;
+}
+
+message Jumprun {
+	JumprunOrigin origin = 1;
+	optional int32 heading = 2;
+	optional int32 exit_distance = 3;
+	optional int32 offset_heading = 4;
+	optional int32 offset_distance = 5;
+	repeated JumprunTurn turns = 6;
+}
+
+message WindsAloftSample {
+	int32 altitude = 1;
+	int32 heading = 2;
+	int32 speed = 3;
+	int32 temperature = 4;
+	bool variable = 5;
+}
+
+message WindsAloft {
+	repeated WindsAloftSample samples = 1;
+}
+
+enum JumperType {
+	EXPERIENCED = 0;
+	AFF_STUDENT = 1;
+	COACH_STUDENT = 2;
+	TANDEM_STUDENT = 3;
+	AFF_INSTRUCTOR = 4;
+	COACH = 5;
+	TANDEM_INSTRUCTOR = 6;
+	VIDEOGRAPHER = 7;
+}
+
+message Jumper {
+	uint64 id = 1;
+	string name = 2;
+	optional string nickname = 3;
+	optional string short_name = 4;
+
+}
+
+message JumperGroup {
+	Jumper leader = 1;
+	repeated Jumper members = 2;
+	optional string name = 3;
+}
+
+message LoadSlot {
+	oneof slot {
+		Jumper jumper = 1;
+		JumperGroup group = 2;
+	}
+}
+
+message Load {
+	uint64 id = 1;
+	string aircraft_name = 2;
+	string load_number = 3;
+	string call_minutes = 4;
+	string slots_available = 5;
+	optional bool is_fueling = 6;
+	optional bool is_turning = 7;
+	optional bool is_no_time = 8;
+	repeated LoadSlot slots = 9;
+}
+
+message Loads {
+	repeated Load loads = 1;
+}
+
+message ManifestUpdate {
+	optional Status status = 1;
+	optional Options options = 2;
+	optional Jumprun jumprun = 3;
+	optional WindsAloft winds_aloft = 4;
+	optional Loads loads = 5;
+}
+
+service ManifestService {
+	rpc StreamUpdates(google.protobuf.Empty) returns (stream ManifestUpdate) {};
+}

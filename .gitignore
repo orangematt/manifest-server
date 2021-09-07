@@ -15,3 +15,4 @@
 # vendor/
 
 manifest-server
+*.pb.go
