@@ -1,9 +1,13 @@
 .PHONY: all
-all: manifest-server
+all: manifest-server manifest-client
 
 .PHONY: manifest-server
 manifest-server: protos
-	go build -o manifest-server cmd/main.go
+	go build -o manifest-server cmd/manifest-server/main.go
+
+.PHONY: manifest-client
+manifest-client: protos
+	go build -o manifest-client cmd/manifest-client/main.go
 
 pkg/server/service.pb.go: pkg/server/service.proto Makefile
 	protoc	-I=. \

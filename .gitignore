@@ -14,5 +14,6 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-manifest-server
+/manifest-client
+/manifest-server
 *.pb.go
