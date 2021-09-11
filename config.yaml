@@ -4,6 +4,7 @@ options_file: /var/lib/manifest-server/options.json
 server:
   http_address: ":8080"
   https_address: ":https"
+  grpc_address: ":9090"
   #cert_file: /etc/cert/services.jumptown.com.pem
 
 burble:

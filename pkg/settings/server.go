@@ -10,6 +10,10 @@ func (s *Settings) WebServerSecureAddress() string {
 	return s.config.GetString("server.https_address")
 }
 
+func (s *Settings) WebServerGRPCAddress() string {
+	return s.config.GetString("server.grpc_address")
+}
+
 func (s *Settings) ServerCertFile() string {
 	return s.config.GetString("server.cert_file")
 }

@@ -4,7 +4,7 @@ package server
 
 import (
 	"fmt"
-	reflect "reflect"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -345,6 +345,8 @@ func (s *manifestServiceServer) StreamUpdates(
 
 	for {
 		select {
+		case <-stream.Context().Done():
+			return nil
 		case <-s.app.Done():
 			return nil
 		case source = <-c:

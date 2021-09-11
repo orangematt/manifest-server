@@ -8,6 +8,7 @@ var defaults = map[string]interface{}{
 
 	"server.http_address":  ":http",
 	"server.https_address": ":https",
+	"server.grpc_address":  ":9090",
 	"server.cert_file":     nil,
 	"server.key_file":      nil,
 

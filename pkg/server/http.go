@@ -16,6 +16,7 @@ import (
 	"github.com/orangematt/manifest-server/pkg/core"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const (
@@ -42,7 +43,8 @@ type WebServer struct {
 
 	app *core.Controller
 
-	grpcServer *grpc.Server
+	grpcServer        *grpc.Server
+	grpcServerAddress string
 
 	lock    sync.Mutex
 	content map[string]WebContent
@@ -50,13 +52,14 @@ type WebServer struct {
 
 func NewWebServer(
 	controller *core.Controller,
-	httpAddress, httpsAddress, certFile, keyFile string,
-) *WebServer {
+	httpAddress, httpsAddress, grpcAddress, certFile, keyFile string,
+) (*WebServer, error) {
 	s := &WebServer{
-		app:      controller,
-		certFile: certFile,
-		keyFile:  keyFile,
-		content:  make(map[string]WebContent),
+		app:               controller,
+		certFile:          certFile,
+		keyFile:           keyFile,
+		content:           make(map[string]WebContent),
+		grpcServerAddress: grpcAddress,
 	}
 	if s.keyFile == "" {
 		s.keyFile = s.certFile
@@ -113,6 +116,14 @@ func NewWebServer(
 			ReadTimeout:  readTimeout,
 			WriteTimeout: writeTimeout,
 		}
+
+		if s.grpcServerAddress != "" {
+			creds, err := credentials.NewServerTLSFromFile(s.certFile, s.keyFile)
+			if err != nil {
+				return nil, err
+			}
+			s.grpcServer = grpc.NewServer(grpc.Creds(creds))
+		}
 	} else {
 		s.httpServer = &http.Server{
 			Handler:      http.HandlerFunc(s.requestHandler),
@@ -120,13 +131,16 @@ func NewWebServer(
 			ReadTimeout:  readTimeout,
 			WriteTimeout: writeTimeout,
 		}
+		if s.grpcServerAddress != "" {
+			s.grpcServer = grpc.NewServer()
+		}
+	}
+	if s.grpcServer != nil {
+		RegisterManifestServiceServer(s.grpcServer,
+			newManifestServiceServer(controller))
 	}
 
-	s.grpcServer = grpc.NewServer()
-	RegisterManifestServiceServer(s.grpcServer,
-		newManifestServiceServer(controller))
-
-	return s
+	return s, nil
 }
 
 func (s *WebServer) Start() error {
@@ -156,6 +170,19 @@ func (s *WebServer) Start() error {
 		}()
 	}
 
+	if s.grpcServer != nil {
+		l, err := net.Listen("tcp", s.grpcServerAddress)
+		if err != nil {
+			return err
+		}
+
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			_ = s.grpcServer.Serve(l)
+		}()
+	}
+
 	return nil
 }
 
@@ -166,6 +193,9 @@ func (s *WebServer) Close() {
 	}
 	if s.httpsServer != nil {
 		_ = s.httpsServer.Shutdown(ctx)
+	}
+	if s.grpcServer != nil {
+		s.grpcServer.GracefulStop()
 	}
 	s.wg.Wait()
 }
@@ -212,20 +242,7 @@ func (s *WebServer) ContentModifyTime(path string) (time.Time, bool) {
 	return time.Now(), false
 }
 
-func (s *WebServer) isGRPC(req *http.Request) bool {
-	if req.ProtoMajor == 2 {
-		contentType := req.Header.Get("Content-Type")
-		return strings.HasPrefix(contentType, "application/grpc")
-	}
-	return false
-}
-
 func (s *WebServer) requestHandler(w http.ResponseWriter, req *http.Request) {
-	if s.isGRPC(req) {
-		s.grpcServer.ServeHTTP(w, req)
-		return
-	}
-
 	h := w.Header()
 	path := strings.TrimPrefix(req.URL.Path, "/")
 

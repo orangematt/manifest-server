@@ -17,15 +17,19 @@ import (
 	"golang.org/x/net/publicsuffix"
 )
 
-func newWebServer(app *core.Controller) *server.WebServer {
+func newWebServer(app *core.Controller) (*server.WebServer, error) {
 	settings := app.Settings()
 
 	httpAddress := settings.WebServerAddress()
 	httpsAddress := settings.WebServerSecureAddress()
+	grpcAddress := settings.WebServerGRPCAddress()
 	certFile := settings.ServerCertFile()
 	keyFile := settings.ServerKeyFile()
-	webServer := server.NewWebServer(app, httpAddress, httpsAddress,
-		certFile, keyFile)
+	webServer, err := server.NewWebServer(app, httpAddress, httpsAddress,
+		grpcAddress, certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
 
 	webServer.SetContentFunc("/settings.html", settings.HTML)
 	webServer.SetContentFunc("/setconfig", settings.FormHandler)
@@ -37,7 +41,7 @@ func newWebServer(app *core.Controller) *server.WebServer {
 
 	webServer.EnableLegacySupport()
 
-	return webServer
+	return webServer, nil
 }
 
 func main() {
@@ -67,7 +71,11 @@ func main() {
 		app.WakeListeners(core.OptionsDataSource)
 	})
 
-	webServer := newWebServer(app)
+	webServer, err := newWebServer(app)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cannot create web server: %v\n", err)
+		os.Exit(1)
+	}
 	if err = webServer.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "cannot start web server: %v\n", err)
 		os.Exit(1)
