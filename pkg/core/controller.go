@@ -23,11 +23,11 @@ import (
 type DataSource uint64
 
 const (
-	BurbleDataSource     DataSource = 0 << 1
-	JumprunDataSource               = 1 << 1
-	METARDataSource                 = 2 << 1
-	WindsAloftDataSource            = 3 << 1
-	OptionsDataSource               = 4 << 1
+	BurbleDataSource     DataSource = 1 << 1
+	JumprunDataSource               = 2 << 1
+	METARDataSource                 = 3 << 1
+	WindsAloftDataSource            = 4 << 1
+	OptionsDataSource               = 5 << 1
 )
 
 type Controller struct {
@@ -200,7 +200,6 @@ func (c *Controller) launchDataSource(
 	go func() {
 		defer c.wg.Done()
 		for {
-			fmt.Fprintf(os.Stderr, "refreshing %s\n", sourceName)
 			if err := refresh(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error refreshing %s: %v\n", sourceName, err)
 			} else {
@@ -302,7 +301,6 @@ func (c *Controller) WakeListeners(source DataSource) {
 }
 
 func (c *Controller) sunrise() {
-	fmt.Fprintf(os.Stderr, "Running sunrise events\n")
 	// Clear the active jumprun at sunrise
 	if c.Jumprun() != nil {
 		if sunrise, _, err := c.SunriseAndSunsetTimes(); err == nil {
@@ -320,7 +318,6 @@ func (c *Controller) sunrise() {
 
 func (c *Controller) sunset() {
 	// Currently nothing to do at sunset
-	fmt.Fprintf(os.Stderr, "Running sunset events\n")
 }
 
 func (c *Controller) runAtSunriseSunset() {
