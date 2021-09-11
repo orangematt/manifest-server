@@ -50,8 +50,11 @@ func main() {
 	flag.Parse()
 
 	// Dial the server
-	creds := credentials.NewTLS(&tls.Config{})
+	creds := credentials.NewTLS(&tls.Config{
+		InsecureSkipVerify: true,
+	})
 	conn, err := grpc.Dial(serverAddress,
+		grpc.WithBlock(),
 		grpc.WithTransportCredentials(creds))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot connect to %s: %v\n", serverAddress, err)
