@@ -7,23 +7,23 @@ option go_package = "github.com/orangematt/manifest-server/pkg/server";
 
 message Status {
 	string winds = 1;
-	string clouds = 2;
-	string weather = 3;
-	string separation = 4;
-	string temperature = 5;
+	string windsColor = 2;
+	string clouds = 3;
+	string cloudsColor = 4;
+	string weather = 5;
+	string weatherColor = 6;
+	string separation = 7;
+	string separationColor = 8;
+	string temperature = 9;
+	string temperatureColor = 10;
 }
 
 message Options {
-	int32 column_count = 1;
 	bool display_nicknames = 2;
 	bool display_weather = 3;
 	bool display_winds = 4;
 	string message = 5;
-}
-
-message JumprunTurn {
-	int32 distance = 1;
-	int32 heading = 2;
+	string messageColor = 6;
 }
 
 message JumprunOrigin {
@@ -33,13 +33,22 @@ message JumprunOrigin {
 	int32 camera_height = 4;
 }
 
+message JumprunTurn {
+	int32 distance = 1;
+	int32 heading = 2;
+}
+
+message JumprunPath {
+	int32 heading = 3;
+	int32 exit_distance = 4;
+	int32 offset_heading = 5;
+	int32 offset_distance = 6;
+	repeated JumprunTurn turns = 7;
+}
+
 message Jumprun {
 	JumprunOrigin origin = 1;
-	optional int32 heading = 2;
-	optional int32 exit_distance = 3;
-	optional int32 offset_heading = 4;
-	optional int32 offset_distance = 5;
-	repeated JumprunTurn turns = 6;
+	JumprunPath path = 2;
 }
 
 message WindsAloftSample {
@@ -67,16 +76,17 @@ enum JumperType {
 
 message Jumper {
 	uint64 id = 1;
-	string name = 2;
-	optional string nickname = 3;
-	optional string short_name = 4;
-
+	JumperType type = 2;
+	string name = 3;
+	string nickname = 4;
+	string short_name = 5;
+	string color = 6;
+	string repr = 7;
 }
 
 message JumperGroup {
 	Jumper leader = 1;
 	repeated Jumper members = 2;
-	optional string name = 3;
 }
 
 message LoadSlot {
@@ -90,16 +100,19 @@ message Load {
 	uint64 id = 1;
 	string aircraft_name = 2;
 	string load_number = 3;
-	string call_minutes = 4;
-	string slots_available = 5;
-	optional bool is_fueling = 6;
-	optional bool is_turning = 7;
-	optional bool is_no_time = 8;
-	repeated LoadSlot slots = 9;
+	int32 call_minutes = 4;
+	string call_minutes_string = 5;
+	int32 slots_available = 6;
+	string slots_available_string = 7;
+	bool is_fueling = 8;
+	bool is_turning = 9;
+	bool is_no_time = 10;
+	repeated LoadSlot slots = 11;
 }
 
 message Loads {
-	repeated Load loads = 1;
+	int32 column_count = 1;
+	repeated Load loads = 2;
 }
 
 message ManifestUpdate {

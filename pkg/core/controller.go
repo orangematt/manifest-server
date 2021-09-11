@@ -27,7 +27,7 @@ const (
 	JumprunDataSource               = 1 << 1
 	METARDataSource                 = 2 << 1
 	WindsAloftDataSource            = 3 << 1
-	SettingsDataSource              = 4 << 1
+	OptionsDataSource               = 4 << 1
 )
 
 type Controller struct {
@@ -39,16 +39,18 @@ type Controller struct {
 	metarSource      *metar.Controller
 	windsAloftSource *winds.Controller
 
-	settings  *settings.Settings
-	listeners []chan DataSource
-	done      chan struct{}
-	wg        sync.WaitGroup
+	settings   *settings.Settings
+	listeners  map[int]chan DataSource
+	listenerID int
+	done       chan struct{}
+	wg         sync.WaitGroup
 }
 
 func NewController(settings *settings.Settings) (*Controller, error) {
 	c := Controller{
-		settings: settings,
-		done:     make(chan struct{}),
+		settings:  settings,
+		listeners: make(map[int]chan DataSource),
+		done:      make(chan struct{}),
 	}
 
 	loc, err := settings.Location()
@@ -139,6 +141,55 @@ func (c *Controller) SeparationDelay(speed int) int {
 	return int(math.Ceil(1000.0 / ftsec))
 }
 
+func (c *Controller) SeparationStrings() (string, string) {
+	windsAloftSource := c.WindsAloftSource()
+
+	color := "#ffffff"
+	if windsAloftSource == nil {
+		return color, ""
+	}
+
+	// We're only interested in 13000 feet
+	samples := windsAloftSource.Samples()
+	if len(samples) < 14 {
+		return color, ""
+	}
+	sample := samples[13]
+
+	var (
+		str, t string
+		speed  int
+	)
+	if sample.LightAndVariable {
+		speed = 85
+	} else {
+		speed = 85 - sample.Speed
+	}
+	if speed <= 0 {
+		color = "#ff0000"
+		str = fmt.Sprintf("Winds are %d knots",
+			sample.Speed)
+	} else {
+		str = fmt.Sprintf("Separation is %d seconds",
+			c.SeparationDelay(speed))
+	}
+
+	t = fmt.Sprintf("(%d℃ / %d℉)", sample.Temperature,
+		int64(metar.FahrenheitFromCelsius(float64(sample.Temperature))))
+
+	if str != "" && t != "" {
+		return color, fmt.Sprintf("%s %s", str, t)
+	}
+	if str == "" {
+		return color, t
+	}
+	if t == "" {
+		return color, str
+	}
+
+	return color, ""
+}
+
 func (c *Controller) launchDataSource(
 	nextRefresh func() time.Time,
 	sourceName string,
@@ -226,10 +277,20 @@ func (c *Controller) SunriseAndSunsetTimes() (sunrise time.Time, sunset time.Tim
 	return
 }
 
-func (c *Controller) AddListener(l chan DataSource) {
+func (c *Controller) AddListener(l chan DataSource) int {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.listeners = append(c.listeners, l)
+
+	c.listenerID++
+	id := c.listenerID
+	c.listeners[id] = l
+	return id
+}
+
+func (c *Controller) RemoveListener(id int) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.listeners, id)
 }
 
 func (c *Controller) WakeListeners(source DataSource) {

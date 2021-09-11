@@ -5,8 +5,11 @@ all: manifest-server
 manifest-server: protos
 	go build -o manifest-server cmd/main.go
 
-pkg/server/service.pb.go: pkg/server/service.proto
-	protoc -I=. --go_out=. --go_opt=paths=source_relative pkg/server/service.proto
+pkg/server/service.pb.go: pkg/server/service.proto Makefile
+	protoc	-I=. \
+		--go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		pkg/server/service.proto
 
 .PHONY: protos
 protos: pkg/server/service.pb.go

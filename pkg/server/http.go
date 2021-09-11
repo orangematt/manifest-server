@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/orangematt/manifest-server/pkg/core"
+
+	"google.golang.org/grpc"
 )
 
 const (
@@ -39,6 +41,8 @@ type WebServer struct {
 	keyFile  string
 
 	app *core.Controller
+
+	grpcServer *grpc.Server
 
 	lock    sync.Mutex
 	content map[string]WebContent
@@ -117,6 +121,10 @@ func NewWebServer(
 			WriteTimeout: writeTimeout,
 		}
 	}
+
+	s.grpcServer = grpc.NewServer()
+	RegisterManifestServiceServer(s.grpcServer,
+		newManifestServiceServer(controller))
 
 	return s
 }
@@ -204,7 +212,20 @@ func (s *WebServer) ContentModifyTime(path string) (time.Time, bool) {
 	return time.Now(), false
 }
 
+func (s *WebServer) isGRPC(req *http.Request) bool {
+	if req.ProtoMajor == 2 {
+		contentType := req.Header.Get("Content-Type")
+		return strings.HasPrefix(contentType, "application/grpc")
+	}
+	return false
+}
+
 func (s *WebServer) requestHandler(w http.ResponseWriter, req *http.Request) {
+	if s.isGRPC(req) {
+		s.grpcServer.ServeHTTP(w, req)
+		return
+	}
+
 	h := w.Header()
 	path := strings.TrimPrefix(req.URL.Path, "/")
 

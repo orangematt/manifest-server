@@ -14,7 +14,6 @@ import (
 
 	"github.com/orangematt/manifest-server/pkg/burble"
 	"github.com/orangematt/manifest-server/pkg/core"
-	"github.com/orangematt/manifest-server/pkg/metar"
 	"github.com/orangematt/manifest-server/pkg/settings"
 )
 
@@ -30,55 +29,6 @@ type Manifest struct {
 	Separation  string             `json:"separation"`
 	Message     string             `json:"message,omitempty"`
 	Loads       []*burble.Load     `json:"loads"`
-}
-
-func (s *WebServer) windsAloftString() (string, string) {
-	windsAloftSource := s.app.WindsAloftSource()
-
-	color := "#ffffff"
-	if windsAloftSource == nil {
-		return color, ""
-	}
-
-	// We're only interested in 13000 feet
-	samples := windsAloftSource.Samples()
-	if len(samples) < 14 {
-		return color, ""
-	}
-	sample := samples[13]
-
-	var (
-		str, t string
-		speed  int
-	)
-	if sample.LightAndVariable {
-		speed = 85
-	} else {
-		speed = 85 - sample.Speed
-	}
-	if speed <= 0 {
-		color = "#ff0000"
-		str = fmt.Sprintf("Winds are %d knots",
-			sample.Speed)
-	} else {
-		str = fmt.Sprintf("Separation is %d seconds",
-			s.app.SeparationDelay(speed))
-	}
-
-	t = fmt.Sprintf("(%d℃ / %d℉)", sample.Temperature,
-		int64(metar.FahrenheitFromCelsius(float64(sample.Temperature))))
-
-	if str != "" && t != "" {
-		return color, fmt.Sprintf("%s %s", str, t)
-	}
-	if str == "" {
-		return color, t
-	}
-	if t == "" {
-		return color, str
-	}
-
-	return color, ""
 }
 
 func (s *WebServer) addToManifest(slots []string, jumper *burble.Jumper) []string {
@@ -181,7 +131,7 @@ func (s *WebServer) updateManifestStaticData() {
 	if b, err := json.Marshal(m); err == nil {
 		s.SetContent("/manifest.json", b, "application/json; charset=utf-8")
 	}
-	aloftColor, aloftString := s.windsAloftString()
+	aloftColor, aloftString := s.app.SeparationStrings()
 	m.Separation = aloftString
 
 	// There are five lines of information that are shown on the upper

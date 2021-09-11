@@ -64,7 +64,7 @@ func main() {
 		os.Exit(1)
 	}
 	settings.SetUpdateFunc(func(_ string) {
-		app.WakeListeners(core.SettingsDataSource)
+		app.WakeListeners(core.OptionsDataSource)
 	})
 
 	webServer := newWebServer(app)
