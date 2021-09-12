@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -323,11 +322,9 @@ func (s *WebServer) EnableLegacySupport() {
 					}
 				}
 				if source&core.WindsAloftDataSource != 0 {
-					fmt.Fprintf(os.Stderr, "Updating winds aloft data\n")
 					s.updateWindsStaticData()
 				}
 				if source&core.JumprunDataSource != 0 {
-					fmt.Fprintf(os.Stderr, "Updating jumprun data\n")
 					s.updateJumprunStaticData()
 				}
 				s.updateManifestStaticData()

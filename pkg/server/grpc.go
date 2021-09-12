@@ -3,27 +3,53 @@
 package server
 
 import (
+	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/orangematt/manifest-server/pkg/burble"
 	"github.com/orangematt/manifest-server/pkg/core"
 	"github.com/orangematt/manifest-server/pkg/settings"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
+
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+type addClientResponse struct {
+	id uint64
+}
+
+type addClientRequest struct {
+	reply   chan addClientResponse
+	updates chan *ManifestUpdate
+}
+
+type removeClientResponse struct{}
+
+type removeClientRequest struct {
+	reply chan removeClientResponse
+	id    uint64
+}
 
 type manifestServiceServer struct {
 	UnimplementedManifestServiceServer
 
 	app     *core.Controller
 	options settings.Options
+	wg      sync.WaitGroup
+	cancel  context.CancelFunc
+
+	addClientChan    chan addClientRequest
+	removeClientChan chan removeClientRequest
 }
 
 func newManifestServiceServer(controller *core.Controller) *manifestServiceServer {
 	return &manifestServiceServer{
-		app: controller,
+		app:              controller,
+		addClientChan:    make(chan addClientRequest, 16),
+		removeClientChan: make(chan removeClientRequest, 16),
 	}
 }
 
@@ -132,6 +158,19 @@ func (s *manifestServiceServer) slotFromJumper(j *burble.Jumper) *LoadSlot {
 func (s *manifestServiceServer) constructUpdate(source core.DataSource) *ManifestUpdate {
 	u := &ManifestUpdate{}
 
+	const optionsSources = core.OptionsDataSource
+	if source&optionsSources != 0 {
+		s.options = s.app.Settings().Options()
+		o := s.options
+		u.Options = &Options{
+			DisplayNicknames: o.DisplayNicknames,
+			DisplayWeather:   o.DisplayWeather,
+			DisplayWinds:     o.DisplayWinds,
+			Message:          o.Message,
+			MessageColor:     "#ffffff",
+		}
+	}
+
 	const statusSources = core.METARDataSource | core.WindsAloftDataSource
 	if source&statusSources != 0 {
 		var separationColor, separationString string
@@ -160,18 +199,6 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			SeparationColor:  separationColor,
 			Temperature:      temperature,
 			TemperatureColor: "#ffffff",
-		}
-	}
-
-	const optionsSources = core.OptionsDataSource
-	if source&optionsSources != 0 {
-		o := s.app.Settings().Options()
-		u.Options = &Options{
-			DisplayNicknames: o.DisplayNicknames,
-			DisplayWeather:   o.DisplayWeather,
-			DisplayWinds:     o.DisplayWinds,
-			Message:          o.Message,
-			MessageColor:     "#ffffff",
 		}
 	}
 
@@ -276,55 +303,35 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 	return u
 }
 
-func (s *manifestServiceServer) diffUpdates(new, old *ManifestUpdate) bool {
-	if new.Status != nil && reflect.DeepEqual(new.Status, old.Status) {
-		new.Status = nil
+func (x *ManifestUpdate) diff(y *ManifestUpdate) bool {
+	if proto.Equal(x.Status, y.Status) {
+		x.Status = nil
 	}
-	if new.Options != nil && reflect.DeepEqual(new.Options, old.Options) {
-		new.Options = nil
+	if proto.Equal(x.Options, y.Options) {
+		x.Options = nil
 	}
-	if new.Jumprun != nil && reflect.DeepEqual(new.Jumprun, old.Jumprun) {
-		new.Jumprun = nil
+	if proto.Equal(x.Jumprun, y.Jumprun) {
+		x.Jumprun = nil
 	}
-	if new.WindsAloft != nil && reflect.DeepEqual(new.WindsAloft, old.WindsAloft) {
-		new.WindsAloft = nil
+	if proto.Equal(x.WindsAloft, y.WindsAloft) {
+		x.WindsAloft = nil
 	}
-	if new.Loads != nil && reflect.DeepEqual(new.Loads, old.Loads) {
-		new.Loads = nil
+	if proto.Equal(x.Loads, y.Loads) {
+		x.Loads = nil
 	}
-	return new.Status != nil || new.Options != nil || new.Jumprun != nil ||
-		new.WindsAloft != nil || new.Loads != nil
+	return x.Status != nil || x.Options != nil || x.Jumprun != nil ||
+		x.WindsAloft != nil || x.Loads != nil
 }
 
-func (s *manifestServiceServer) mergeUpdates(to, from *ManifestUpdate) {
-	if from.Status != nil {
-		to.Status = from.Status
-	}
-	if from.Options != nil {
-		to.Options = from.Options
-	}
-	if from.Jumprun != nil {
-		to.Jumprun = from.Jumprun
-	}
-	if from.WindsAloft != nil {
-		to.WindsAloft = from.WindsAloft
-	}
-	if from.Loads != nil {
-		to.Loads = from.Loads
-	}
-}
-
-func (s *manifestServiceServer) StreamUpdates(
-	_ *emptypb.Empty,
-	stream ManifestService_StreamUpdatesServer,
-) error {
-	// Start listening for changes before sending out the initial baseline
-	// ManifestUpdate so that we don't lose any updates.
+func (s *manifestServiceServer) processUpdates(ctx context.Context) {
 	c := make(chan core.DataSource, 128)
 	id := s.app.AddListener(c)
 	defer func() {
 		s.app.RemoveListener(id)
 	}()
+
+	clientID := uint64(0)
+	clients := make(map[uint64]chan *ManifestUpdate)
 
 	// Create and send the initial baseline ManifestUpdate
 	source := core.BurbleDataSource | core.OptionsDataSource
@@ -337,18 +344,25 @@ func (s *manifestServiceServer) StreamUpdates(
 	if s.app.WindsAloftSource() != nil {
 		source |= core.WindsAloftDataSource
 	}
-
 	lastUpdate := s.constructUpdate(source)
-	if err := stream.Send(lastUpdate); err != nil {
-		return err
-	}
 
 	for {
 		select {
-		case <-stream.Context().Done():
-			return nil
-		case <-s.app.Done():
-			return nil
+		case <-ctx.Done():
+			return
+
+		case req := <-s.addClientChan:
+			clientID++
+			clients[clientID] = req.updates
+			req.reply <- addClientResponse{
+				id: clientID,
+			}
+			req.updates <- lastUpdate
+
+		case req := <-s.removeClientChan:
+			delete(clients, req.id)
+			req.reply <- removeClientResponse{}
+
 		case source = <-c:
 		drain:
 			for {
@@ -359,12 +373,66 @@ func (s *manifestServiceServer) StreamUpdates(
 					break drain
 				}
 			}
-			u := s.constructUpdate(source)
-			if s.diffUpdates(u, lastUpdate) {
-				if err := stream.Send(u); err != nil {
-					return err
+			if u := s.constructUpdate(source); u.diff(lastUpdate) {
+				for _, client := range clients {
+					client <- u
 				}
-				s.mergeUpdates(lastUpdate, u)
+				proto.Merge(lastUpdate, u)
+			}
+		}
+	}
+}
+
+func (s *manifestServiceServer) Start() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.processUpdates(ctx)
+	}()
+}
+
+func (s *manifestServiceServer) Stop() {
+	s.cancel()
+	s.wg.Wait()
+}
+
+func (s *manifestServiceServer) addClient(c chan *ManifestUpdate) uint64 {
+	request := addClientRequest{
+		reply:   make(chan addClientResponse),
+		updates: c,
+	}
+	response := <-request.reply
+	return response.id
+}
+
+func (s *manifestServiceServer) removeClient(id uint64) {
+	request := removeClientRequest{
+		reply: make(chan removeClientResponse),
+		id:    id,
+	}
+	<-request.reply
+}
+
+func (s *manifestServiceServer) StreamUpdates(
+	_ *emptypb.Empty,
+	stream ManifestService_StreamUpdatesServer,
+) error {
+	c := make(chan *ManifestUpdate, 16)
+	id := s.addClient(c)
+	defer s.removeClient(id)
+
+	for {
+		select {
+		case <-stream.Context().Done():
+			return nil
+		case <-s.app.Done():
+			return nil
+		case u := <-c:
+			if err := stream.Send(u); err != nil {
+				return err
 			}
 		}
 	}

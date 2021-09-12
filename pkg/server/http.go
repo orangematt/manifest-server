@@ -45,6 +45,7 @@ type WebServer struct {
 
 	grpcServer        *grpc.Server
 	grpcServerAddress string
+	grpcServiceServer *manifestServiceServer
 
 	lock    sync.Mutex
 	content map[string]WebContent
@@ -136,8 +137,8 @@ func NewWebServer(
 		}
 	}
 	if s.grpcServer != nil {
-		RegisterManifestServiceServer(s.grpcServer,
-			newManifestServiceServer(controller))
+		s.grpcServiceServer = newManifestServiceServer(controller)
+		RegisterManifestServiceServer(s.grpcServer, s.grpcServiceServer)
 	}
 
 	return s, nil
@@ -176,6 +177,8 @@ func (s *WebServer) Start() error {
 			return err
 		}
 
+		s.grpcServiceServer.Start()
+
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
@@ -196,6 +199,7 @@ func (s *WebServer) Close() {
 	}
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
+		s.grpcServiceServer.Stop()
 	}
 	s.wg.Wait()
 }
