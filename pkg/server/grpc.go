@@ -404,6 +404,7 @@ func (s *manifestServiceServer) addClient(c chan *ManifestUpdate) uint64 {
 		reply:   make(chan addClientResponse),
 		updates: c,
 	}
+	s.addClientChan <- request
 	response := <-request.reply
 	return response.id
 }
@@ -413,6 +414,7 @@ func (s *manifestServiceServer) removeClient(id uint64) {
 		reply: make(chan removeClientResponse),
 		id:    id,
 	}
+	s.removeClientChan <- request
 	<-request.reply
 }
 
