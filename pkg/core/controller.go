@@ -23,11 +23,11 @@ import (
 type DataSource uint64
 
 const (
-	BurbleDataSource     DataSource = 1 << 1
-	JumprunDataSource               = 2 << 1
-	METARDataSource                 = 3 << 1
-	WindsAloftDataSource            = 4 << 1
-	OptionsDataSource               = 5 << 1
+	BurbleDataSource     DataSource = 1 << 0
+	JumprunDataSource               = 1 << 1
+	METARDataSource                 = 1 << 2
+	WindsAloftDataSource            = 1 << 3
+	OptionsDataSource               = 1 << 4
 )
 
 type Controller struct {
