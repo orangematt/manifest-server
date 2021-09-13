@@ -357,7 +357,8 @@ func (s *manifestServiceServer) processUpdates(ctx context.Context) {
 			req.reply <- addClientResponse{
 				id: clientID,
 			}
-			req.updates <- lastUpdate
+			update := proto.Clone(lastUpdate).(*ManifestUpdate)
+			req.updates <- update
 
 		case req := <-s.removeClientChan:
 			delete(clients, req.id)
@@ -375,7 +376,8 @@ func (s *manifestServiceServer) processUpdates(ctx context.Context) {
 			}
 			if u := s.constructUpdate(source); u.diff(lastUpdate) {
 				for _, client := range clients {
-					client <- u
+					update := proto.Clone(u).(*ManifestUpdate)
+					client <- update
 				}
 				proto.Merge(lastUpdate, u)
 			}
