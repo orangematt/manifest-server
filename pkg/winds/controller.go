@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -47,22 +48,22 @@ func NewController(settings *settings.Settings) *Controller {
 	return wa
 }
 
-func (c *Controller) Refresh() error {
+func (c *Controller) Refresh() (bool, error) {
 	request, err := c.settings.NewHTTPRequest(http.MethodGet, c.url, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	request.Header.Set("Referer", "https://markschulze.net/winds/")
 
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil || len(data) == 0 {
-		return err
+		return false, err
 	}
 
 	// It would be nicer to parse the data into structs, but it's actually
@@ -73,11 +74,11 @@ func (c *Controller) Refresh() error {
 		// If we get unparseable data, dump it to a file so we can
 		// review it later to see what the problem is.
 		_ = ioutil.WriteFile("winds.json", data, 0644)
-		return err
+		return false, err
 	}
 	windsAloftData, ok := rawWindsAloftData.(map[string]interface{})
 	if !ok {
-		return errors.New("winds aloft data is invalid")
+		return false, errors.New("winds aloft data is invalid")
 	}
 
 	now := time.Now()
@@ -96,13 +97,13 @@ func (c *Controller) Refresh() error {
 		temp      map[string]interface{}
 	)
 	if direction, ok = windsAloftData["direction"].(map[string]interface{}); !ok {
-		return errors.New("direction information missing from winds aloft data")
+		return false, errors.New("direction information missing from winds aloft data")
 	}
 	if speed, ok = windsAloftData["speed"].(map[string]interface{}); !ok {
-		return errors.New("speed data missing from winds aloft data")
+		return false, errors.New("speed data missing from winds aloft data")
 	}
 	if temp, ok = windsAloftData["temp"].(map[string]interface{}); !ok {
-		return errors.New("temperature data missing from winds aloft data")
+		return false, errors.New("temperature data missing from winds aloft data")
 	}
 
 	maxAltitude := len(direction)
@@ -125,10 +126,18 @@ func (c *Controller) Refresh() error {
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.samples = samples
-	c.validTime = validTime
 
-	return nil
+	changed := false
+	if !reflect.DeepEqual(c.samples, samples) {
+		c.samples = samples
+		changed = true
+	}
+	if c.validTime != validTime {
+		c.validTime = validTime
+		changed = true
+	}
+
+	return changed, nil
 }
 
 // Samples returns the samples most recently loaded from the data source.

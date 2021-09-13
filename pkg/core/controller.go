@@ -193,16 +193,16 @@ func (c *Controller) SeparationStrings() (string, string) {
 func (c *Controller) launchDataSource(
 	nextRefresh func() time.Time,
 	sourceName string,
-	refresh func() error,
+	refresh func() (bool, error),
 	update func(),
 ) {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
 		for {
-			if err := refresh(); err != nil {
+			if changed, err := refresh(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error refreshing %s: %v\n", sourceName, err)
-			} else {
+			} else if changed {
 				update()
 			}
 

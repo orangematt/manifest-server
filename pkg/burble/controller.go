@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"sync"
 
@@ -62,14 +63,14 @@ func (c *Controller) RefreshCookies() error {
 }
 
 // Refresh retrieves new data from Burble
-func (c *Controller) Refresh() error {
+func (c *Controller) Refresh() (bool, error) {
 	u, err := url.Parse(burbleManifestURL)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(http.DefaultClient.Jar.Cookies(u)) == 0 {
 		if err = c.RefreshCookies(); err != nil {
-			return err
+			return false, err
 		}
 	}
 
@@ -79,7 +80,7 @@ func (c *Controller) Refresh() error {
 
 	request, err := c.settings.NewHTTPRequest(http.MethodPost, burbleManifestURL, body)
 	if err != nil {
-		return err
+		return false, err
 	}
 	request.Header.Set("Origin", burbleBaseURL)
 	request.Header.Set("Referer", burblePublicURL)
@@ -87,13 +88,13 @@ func (c *Controller) Refresh() error {
 
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// It would be nicer to parse the data into structs, but Burble returns
@@ -103,13 +104,13 @@ func (c *Controller) Refresh() error {
 
 	var rawBurbleData interface{}
 	if err = json.Unmarshal(data, &rawBurbleData); err != nil {
-		return err
+		return false, err
 	}
 
 	var loads []*Load
 	burbleData := rawBurbleData.(map[string]interface{})
 	if _, ok := burbleData["loads"]; !ok {
-		return errors.New("Burble data is missing load information")
+		return false, errors.New("Burble data is missing load information")
 	}
 
 	sourceLoads := burbleData["loads"].([]interface{})
@@ -221,10 +222,18 @@ func (c *Controller) Refresh() error {
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.columnCount = columnCount
-	c.loads = loads
 
-	return nil
+	changed := false
+	if c.columnCount != columnCount {
+		c.columnCount = columnCount
+		changed = true
+	}
+	if !reflect.DeepEqual(c.loads, loads) {
+		c.loads = loads
+		changed = true
+	}
+
+	return changed, nil
 }
 
 func (c *Controller) Loads() []*Load {

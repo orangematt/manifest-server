@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -141,17 +142,17 @@ func NewController(station string) *Controller {
 const metarURL = "https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=csv&hoursBeforeNow=24&mostRecent=true"
 
 // Refresh retrieves and parses weather data.
-func (c *Controller) Refresh() error {
+func (c *Controller) Refresh() (bool, error) {
 	url := fmt.Sprintf("%s&stationString=%s", metarURL, c.station)
 	resp, err := http.Get(url)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// There should be at least 5 lines. Any less is invalid data.
@@ -168,16 +169,16 @@ func (c *Controller) Refresh() error {
 			l = strings.TrimSpace(l)
 			fmt.Printf("Line %d: %s\n", i, l)
 		}
-		return fmt.Errorf("Too few lines (expected >= 5; got %d)",
+		return false, fmt.Errorf("Too few lines (expected >= 5; got %d)",
 			len(lines))
 	}
 
 	nresults, err := strconv.Atoi(strings.Fields(strings.TrimSpace(lines[4]))[0])
 	if err != nil {
-		return fmt.Errorf("Error parsing # results: %v", err)
+		return false, fmt.Errorf("Error parsing # results: %v", err)
 	}
 	if nresults < 1 {
-		return errors.New("No results")
+		return false, errors.New("No results")
 	}
 
 	var (
@@ -238,18 +239,29 @@ func (c *Controller) Refresh() error {
 	}
 
 	c.lock.Lock()
-	c.fields = parsedFields
-	if len(highClouds) > 0 {
-		c.skyCover = strings.Join(highClouds, ", ")
-	} else if len(lowClouds) > 0 {
-		c.skyCover = strings.Join(lowClouds, ", ")
-	} else {
-		c.skyCover = "clear"
-	}
-	c.wxCondition = wxCondition
-	c.lock.Unlock()
+	defer c.lock.Unlock()
 
-	return nil
+	changed := false
+	if !reflect.DeepEqual(c.fields, parsedFields) {
+		c.fields = parsedFields
+		changed = true
+	}
+	skyCover := "clear"
+	if len(highClouds) > 0 {
+		skyCover = strings.Join(highClouds, ", ")
+	} else if len(lowClouds) > 0 {
+		skyCover = strings.Join(lowClouds, ", ")
+	}
+	if c.skyCover != skyCover {
+		c.skyCover = skyCover
+		changed = true
+	}
+	if c.wxCondition != wxCondition {
+		c.wxCondition = wxCondition
+		changed = true
+	}
+
+	return changed, nil
 }
 
 // WindSpeedMPH returns the current wind speed in MPH.
