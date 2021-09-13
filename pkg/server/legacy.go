@@ -183,7 +183,7 @@ func (s *WebServer) updateManifestStaticData() {
 	lines[1] = fmt.Sprintf("%s %s", windsColor, metarSource.WindConditions())
 	lines[2] = fmt.Sprintf("#ffffff %s", metarSource.SkyCover())
 	lines[3] = fmt.Sprintf("#ffffff %s", metarSource.WeatherConditions())
-	lines[4] = fmt.Sprintf("%s %s", aloftColor, aloftString)
+	lines[4] = fmt.Sprintf("#%06x %s", aloftColor, aloftString)
 	lines[5] = fmt.Sprintf("#ffffff %s", s.messageString())
 
 	loads := burbleSource.Loads()

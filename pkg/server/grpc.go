@@ -54,23 +54,26 @@ func newManifestServiceServer(controller *core.Controller) *manifestServiceServe
 }
 
 func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper) *Jumper {
-	var color, prefix string
+	var (
+		color  uint32
+		prefix string
+	)
 	if leader != nil {
 		color = leader.Color
 	} else {
 		switch {
 		case j.IsTandem:
-			color = "#ffff00" // yellow
+			color = 0xffff00 // yellow
 		case j.IsStudent || strings.HasSuffix(j.ShortName, " + Gear"):
-			color = "#00ff00" // green
+			color = 0x00ff00 // green
 			if strings.HasSuffix(j.ShortName, " H/P") {
 				prefix = "Hop & Pop"
 			}
 		case strings.HasPrefix(j.ShortName, "3-5k") || strings.HasPrefix(j.ShortName, "3.5k"):
-			color = "#ff00ff" // magenta
+			color = 0xff00ff // magenta
 			prefix = "Hop & Pop"
 		default:
-			color = "#ffffff" // white
+			color = 0xffffff // white
 		}
 	}
 
@@ -167,17 +170,20 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			DisplayWeather:   o.DisplayWeather,
 			DisplayWinds:     o.DisplayWinds,
 			Message:          o.Message,
-			MessageColor:     "#ffffff",
+			MessageColor:     0xffffff,
 		}
 	}
 
 	const statusSources = core.METARDataSource | core.WindsAloftDataSource
 	if source&statusSources != 0 {
-		var separationColor, separationString string
+		var (
+			separationColor  uint32
+			separationString string
+		)
 		if s.app.WindsAloftSource() != nil {
 			separationColor, separationString = s.app.SeparationStrings()
 		} else {
-			separationColor = "#ffffff"
+			separationColor = 0xffffff
 		}
 
 		var winds, clouds, weather, temperature string
@@ -190,15 +196,15 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 
 		u.Status = &Status{
 			Winds:            winds,
-			WindsColor:       "#ffffff",
+			WindsColor:       0xffffff,
 			Clouds:           clouds,
-			CloudsColor:      "#ffffff",
+			CloudsColor:      0xffffff,
 			Weather:          weather,
-			WeatherColor:     "#ffffff",
+			WeatherColor:     0xffffff,
 			Separation:       separationString,
 			SeparationColor:  separationColor,
 			Temperature:      temperature,
-			TemperatureColor: "#ffffff",
+			TemperatureColor: 0xffffff,
 		}
 	}
 

@@ -141,10 +141,10 @@ func (c *Controller) SeparationDelay(speed int) int {
 	return int(math.Ceil(1000.0 / ftsec))
 }
 
-func (c *Controller) SeparationStrings() (string, string) {
+func (c *Controller) SeparationStrings() (uint32, string) {
 	windsAloftSource := c.WindsAloftSource()
 
-	color := "#ffffff"
+	color := uint32(0xffffff)
 	if windsAloftSource == nil {
 		return color, ""
 	}
@@ -166,7 +166,7 @@ func (c *Controller) SeparationStrings() (string, string) {
 		speed = 85 - sample.Speed
 	}
 	if speed <= 0 {
-		color = "#ff0000"
+		color = 0xff0000
 		str = fmt.Sprintf("Winds are %d knots",
 			sample.Speed)
 	} else {

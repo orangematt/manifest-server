@@ -7,15 +7,15 @@ option go_package = "github.com/orangematt/manifest-server/pkg/server";
 
 message Status {
 	string winds = 1;
-	string windsColor = 2;
+	uint32 windsColor = 2;
 	string clouds = 3;
-	string cloudsColor = 4;
+	uint32 cloudsColor = 4;
 	string weather = 5;
-	string weatherColor = 6;
+	uint32 weatherColor = 6;
 	string separation = 7;
-	string separationColor = 8;
+	uint32 separationColor = 8;
 	string temperature = 9;
-	string temperatureColor = 10;
+	uint32 temperatureColor = 10;
 }
 
 message Options {
@@ -23,7 +23,7 @@ message Options {
 	bool display_weather = 3;
 	bool display_winds = 4;
 	string message = 5;
-	string messageColor = 6;
+	uint32 messageColor = 6;
 }
 
 message JumprunOrigin {
@@ -80,7 +80,7 @@ message Jumper {
 	string name = 3;
 	string nickname = 4;
 	string short_name = 5;
-	string color = 6;
+	uint32 color = 6;
 	string repr = 7;
 }
 
