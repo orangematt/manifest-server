@@ -82,6 +82,7 @@ message Jumper {
 	string short_name = 5;
 	uint32 color = 6;
 	string repr = 7;
+	string rig_name = 8;
 }
 
 message JumperGroup {

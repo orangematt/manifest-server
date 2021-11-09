@@ -165,6 +165,9 @@ func (c *Controller) Refresh() (bool, error) {
 				name,
 				nickname,
 				memberData["short_name"].(string))
+			if rigName, ok := memberData["rig_name"].(string); ok {
+				primaryJumper.RigName = rigName
+			}
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
@@ -199,6 +202,9 @@ func (c *Controller) Refresh() (bool, error) {
 					memberData["short_name"].(string))
 				if _, ok = memberData["handycam_jump"].(string); ok {
 					jumper.ShortName = "Handycam"
+				}
+				if rigName, ok := memberData["rig_name"].(string); ok {
+					jumper.RigName = rigName
 				}
 				primaryJumper.AddGroupMember(jumper)
 			}

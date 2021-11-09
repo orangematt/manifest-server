@@ -9,6 +9,7 @@ type Jumper struct {
 	Name           string    `json:"name"`
 	Nickname       string    `json:"nickname"`
 	ShortName      string    `json:"short_name"`
+	RigName        string    `json:"rig_name"`
 	IsInstructor   bool      `json:"is_instructor"`
 	IsTandem       bool      `json:"is_tandem"`
 	IsStudent      bool      `json:"is_student"`

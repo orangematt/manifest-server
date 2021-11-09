@@ -88,7 +88,11 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 		case j.IsTandem:
 			repr = "Tandem: " + name
 		case prefix != "":
-			repr = fmt.Sprintf("%s: %s (%s)", prefix, name, j.ShortName)
+			shortName := j.ShortName
+			if rigName := j.RigName; rigName != "" {
+				shortName = fmt.Sprintf("%s / %s", shortName, rigName)
+			}
+			repr = fmt.Sprintf("%s: %s (%s)", prefix, name, shortName)
 		default:
 			repr = fmt.Sprintf("%s (%s)", name, j.ShortName)
 		}
@@ -132,6 +136,7 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 		Nickname:  j.Nickname,
 		Color:     color,
 		Repr:      repr,
+		RigName:   j.RigName,
 	}
 }
 
