@@ -28,6 +28,10 @@ const (
 	METARDataSource                 = 1 << 2
 	WindsAloftDataSource            = 1 << 3
 	OptionsDataSource               = 1 << 4
+	PreSunriseDataSource            = 1 << 5 // Fires once per minute for an hour prior to sunrise
+	SunriseDataSource               = 1 << 6
+	PreSunsetDataSource             = 1 << 7 // Fires once per minute for an hour prior to sunset
+	SunsetDataSource                = 1 << 8
 )
 
 type Controller struct {
@@ -276,6 +280,48 @@ func (c *Controller) SunriseAndSunsetTimes() (sunrise time.Time, sunset time.Tim
 	return
 }
 
+func (c *Controller) SunriseMessage() string {
+	sunrise, _, err := c.SunriseAndSunsetTimes()
+	if err != nil {
+		return ""
+	}
+
+	dzTimeNow := c.CurrentTime()
+	if dzTimeNow.Before(sunrise) {
+		delta := sunrise.Sub(dzTimeNow).Minutes()
+		switch {
+		case delta == 1:
+			return "Sunrise is in 1 minute"
+		case delta == 60:
+			return "Sunrise is in 1 hour"
+		case delta > 1 && delta < 60:
+			return fmt.Sprintf("Sunrise is in %d minutes", int(delta))
+		}
+	}
+	return ""
+}
+
+func (c *Controller) SunsetMessage() string {
+	_, sunset, err := c.SunriseAndSunsetTimes()
+	if err != nil {
+		return ""
+	}
+
+	dzTimeNow := c.CurrentTime()
+	if dzTimeNow.Before(sunset) {
+		delta := sunset.Sub(dzTimeNow).Minutes()
+		switch {
+		case delta == 1:
+			return "Sunset is in 1 minute"
+		case delta == 60:
+			return "Sunset is in 1 hour"
+		case delta > 1 && delta < 60:
+			return fmt.Sprintf("Sunset is in %d minutes", int(delta))
+		}
+	}
+	return ""
+}
+
 func (c *Controller) AddListener(l chan DataSource) int {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -314,16 +360,18 @@ func (c *Controller) sunrise() {
 			}
 		}
 	}
+	c.WakeListeners(SunriseDataSource)
 }
 
 func (c *Controller) sunset() {
-	// Currently nothing to do at sunset
+	c.WakeListeners(SunsetDataSource)
 }
 
 func (c *Controller) runAtSunriseSunset() {
+	lastPre := []int{-1, -1}
 	lastSunrise := []int{0, 0, 0}
 	lastSunset := []int{0, 0, 0}
-	t := time.NewTicker(20 * time.Second)
+	t := time.NewTicker(1 * time.Second)
 	for {
 		sunrise, sunset, err := c.SunriseAndSunsetTimes()
 		if err != nil {
@@ -339,6 +387,12 @@ func (c *Controller) runAtSunriseSunset() {
 				c.sunset()
 				lastSunset = thisSunset
 			}
+		} else if sunset.After(now) && sunset.Sub(now).Hours() <= 1 {
+			thisPre := []int{now.Hour(), now.Minute()}
+			if !reflect.DeepEqual(lastPre, thisPre) {
+				c.WakeListeners(PreSunsetDataSource)
+				lastPre = thisPre
+			}
 		}
 		if now.Equal(sunrise) || now.After(sunrise) {
 			y, m, d := sunrise.Date()
@@ -346,6 +400,12 @@ func (c *Controller) runAtSunriseSunset() {
 			if !reflect.DeepEqual(lastSunrise, thisSunrise) {
 				c.sunrise()
 				lastSunrise = thisSunrise
+			}
+		} else if sunrise.After(now) && sunrise.Sub(now).Hours() <= 1 {
+			thisPre := []int{now.Hour(), now.Minute()}
+			if !reflect.DeepEqual(lastPre, thisPre) {
+				c.WakeListeners(PreSunriseDataSource)
+				lastPre = thisPre
 			}
 		}
 

@@ -24,6 +24,8 @@ message Options {
 	bool display_winds = 4;
 	string message = 5;
 	uint32 messageColor = 6;
+	string sunrise = 7;
+	string sunset = 8;
 }
 
 message JumprunOrigin {

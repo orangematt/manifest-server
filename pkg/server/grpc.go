@@ -166,7 +166,9 @@ func (s *manifestServiceServer) slotFromJumper(j *burble.Jumper) *LoadSlot {
 func (s *manifestServiceServer) constructUpdate(source core.DataSource) *ManifestUpdate {
 	u := &ManifestUpdate{}
 
-	const optionsSources = core.OptionsDataSource
+	const sunriseSources = core.PreSunriseDataSource | core.SunriseDataSource
+	const sunsetSources = core.PreSunsetDataSource | core.SunsetDataSource
+	const optionsSources = core.OptionsDataSource | sunriseSources | sunsetSources
 	if source&optionsSources != 0 {
 		s.options = s.app.Settings().Options()
 		o := s.options
@@ -176,6 +178,12 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			DisplayWinds:     o.DisplayWinds,
 			Message:          o.Message,
 			MessageColor:     0xffffff,
+		}
+		if source&sunriseSources != 0 {
+			u.Options.Sunrise = s.app.SunriseMessage()
+		}
+		if source&sunsetSources != 0 {
+			u.Options.Sunset = s.app.SunsetMessage()
 		}
 	}
 
