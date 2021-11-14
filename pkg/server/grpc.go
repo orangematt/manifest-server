@@ -268,7 +268,7 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 		}
 	}
 
-	const loadsSources = core.BurbleDataSource
+	const loadsSources = core.BurbleDataSource | core.OptionsDataSource
 	if source&loadsSources != 0 {
 		b := s.app.BurbleSource()
 		u.Loads = &Loads{
