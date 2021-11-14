@@ -101,7 +101,7 @@ func (s *WebServer) updateManifestStaticData() {
 		Message:     s.messageString(),
 		Loads:       burbleSource.Loads(),
 	}
-	if t, ok := s.ContentModifyTime("/jumprun.json"); ok {
+	if t, ok := s.ContentModifyTime("/jumprun"); ok {
 		m.JumprunTime = t.Format(http.TimeFormat)
 	}
 	if t, ok := s.ContentModifyTime("/winds"); ok {
@@ -283,6 +283,9 @@ func (s *WebServer) EnableLegacySupport() {
 	if s.app.Settings().WindsEnabled() {
 		s.SetContent("/winds", []byte{}, "text/plain; charset=utf-8")
 		s.SetContent("/winds.json", []byte("{}"), "application/json; charset=utf-8")
+	}
+	if s.app.Settings().JumprunEnabled() {
+		s.updateJumprunStaticData()
 	}
 
 	c := make(chan core.DataSource, 64)
