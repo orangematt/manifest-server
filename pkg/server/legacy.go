@@ -48,28 +48,37 @@ func (s *WebServer) addToManifest(slots []string, jumper *burble.Jumper) []strin
 		color = "#ffffff" // white
 	}
 
+	displayNicknames := s.app.Settings().DisplayNicknames()
+	jumperName := jumper.Name
+	if displayNicknames && jumper.Nickname != "" {
+		jumperName = jumper.Nickname
+	}
 	shortName := jumper.ShortName
 	if rigName := jumper.RigName; rigName != "" {
 		shortName = fmt.Sprintf("%s / %s", shortName, rigName)
 	}
 	if jumper.IsTandem {
 		slots = append(slots, fmt.Sprintf("%s Tandem: %s", color,
-			jumper.Name))
+			jumperName))
 	} else if prefix != "" {
 		slots = append(slots, fmt.Sprintf("%s %s: %s (%s)", color,
-			prefix, jumper.Name, shortName))
+			prefix, jumperName, shortName))
 	} else {
 		slots = append(slots, fmt.Sprintf("%s %s (%s)", color,
-			jumper.Name, jumper.ShortName))
+			jumperName, shortName))
 	}
 
 	for _, member := range jumper.GroupMembers {
+		memberName := member.Name
+		if displayNicknames && member.Nickname != "" {
+			memberName = member.Nickname
+		}
 		shortName = member.ShortName
 		if rigName := member.RigName; rigName != "" {
 			shortName = fmt.Sprintf("%s / %s", shortName, rigName)
 		}
 		slots = append(slots, fmt.Sprintf("%s \t%s (%s)", color,
-			member.Name, shortName))
+			memberName, shortName))
 	}
 
 	return slots
