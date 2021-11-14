@@ -137,7 +137,7 @@ func (c *Controller) SetFromURLValues(values url.Values) error {
 		if v64, err = strconv.ParseInt(value, 10, 32); err != nil {
 			return fmt.Errorf("cannot parse hook heading %d: %v", i, err)
 		}
-		if v < 0 || v > 359 {
+		if v64 < 0 || v64 > 359 {
 			return fmt.Errorf("hook heading %d out of range: %d", i, v64)
 		}
 		turn.Heading = int(v64)
@@ -261,7 +261,7 @@ const jumprunHTML = `<html>
 	<head>
 		<title>Manifest - Set Jump Run</title>
 		<script>
-		function reset() {
+		function reset_origin() {
 			document.getElementById("latitude").value = "{{latitude}}";
 			document.getElementById("longitude").value = "{{longitude}}";
 			document.getElementById("magnetic_declination").value = "{{magnetic_declination}}";
@@ -300,7 +300,7 @@ const jumprunHTML = `<html>
 					<input type="text" id="camera_height" name="camera_height" value="{{.CameraHeight}}">
 				</div>
 				<div>
-					<input type="button" value="Reset to Default" onclick="reset();">
+					<input type="button" value="Reset to Default" onclick="reset_origin();">
 				</div>
 			</div>
 			<div>
