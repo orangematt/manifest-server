@@ -50,7 +50,7 @@ message JumprunPath {
 
 message Jumprun {
 	JumprunOrigin origin = 1;
-	JumprunPath path = 2;
+	optional JumprunPath path = 2;
 }
 
 message WindsAloftSample {
