@@ -80,33 +80,11 @@ func (s *WebServer) messageString() string {
 		return message
 	}
 
-	sunrise, sunset, err := s.app.SunriseAndSunsetTimes()
-	if err != nil {
-		return ""
+	if s := s.app.SunriseMessage(); s != "" {
+		return s
 	}
-
-	dzTimeNow := s.app.CurrentTime()
-	if dzTimeNow.Before(sunset) {
-		delta := sunset.Sub(dzTimeNow).Minutes()
-		switch {
-		case delta == 1:
-			return "Sunset is in 1 minute"
-		case delta == 60:
-			return "Sunset is in 1 hour"
-		case delta > 1 && delta < 60:
-			return fmt.Sprintf("Sunset is in %d minutes", int(delta))
-		}
-	}
-	if dzTimeNow.Before(sunrise) {
-		delta := sunrise.Sub(dzTimeNow).Minutes()
-		switch {
-		case delta == 1:
-			return "Sunrise is in 1 minute"
-		case delta == 60:
-			return "Sunrise is in 1 hour"
-		case delta > 1 && delta < 60:
-			return fmt.Sprintf("Sunrise is in %d minutes", int(delta))
-		}
+	if s := s.app.SunsetMessage(); s != "" {
+		return s
 	}
 
 	return ""
