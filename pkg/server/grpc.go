@@ -398,7 +398,28 @@ func (s *manifestServiceServer) processUpdates(ctx context.Context) {
 					update := proto.Clone(u).(*ManifestUpdate)
 					client <- update
 				}
-				proto.Merge(lastUpdate, u)
+				// We cannot use proto.Merge here because we
+				// attribute meaning to nil on optional fields,
+				// but proto.Merge ignores nil when merging in,
+				// not clearing the field in the destination.
+				// This is what we want at the top-level, but
+				// not the lower levels.
+				//proto.Merge(lastUpdate, u)
+				if u.Status != nil {
+					lastUpdate.Status = u.Status
+				}
+				if u.Options != nil {
+					lastUpdate.Options = u.Options
+				}
+				if u.Jumprun != nil {
+					lastUpdate.Jumprun = u.Jumprun
+				}
+				if u.WindsAloft != nil {
+					lastUpdate.WindsAloft = u.WindsAloft
+				}
+				if u.Loads != nil {
+					lastUpdate.Loads = u.Loads
+				}
 			}
 		}
 	}
