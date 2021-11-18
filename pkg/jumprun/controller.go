@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -248,9 +249,23 @@ func (c *Controller) HTML(w http.ResponseWriter, req *http.Request) {
 }
 
 func (c *Controller) FormHandler(w http.ResponseWriter, req *http.Request) {
-	if err := req.ParseForm(); err != nil {
-		http.NotFound(w, req)
-		return
+	contentType := req.Header.Get("content-type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := req.ParseMultipartForm(32 << 20); err != nil {
+			http.NotFound(w, req)
+			return
+		}
+		req.Form = url.Values{}
+		for key, values := range req.MultipartForm.Value {
+			for _, value := range values {
+				req.Form.Add(key, value)
+			}
+		}
+	} else {
+		if err := req.ParseForm(); err != nil {
+			http.NotFound(w, req)
+			return
+		}
 	}
 	if err := c.SetFromURLValues(req.Form); err == nil {
 		_ = c.Write()
@@ -270,7 +285,7 @@ const jumprunHTML = `<html>
 		</script>
 	</head>
 	<body>
-		<form action="/setjumprun" method="post">
+		<form action="/setjumprun" id="jumprun" method="post">
 			<div>
 				All headings are relative to magentic north. All distances are
 				specified in tenths of a mile (e.g. 1 is 1/10 mile, 5 is
@@ -304,15 +319,6 @@ const jumprunHTML = `<html>
 				</div>
 			</div>
 			<div>
-				<h4>Offset:</h4>
-				<div>
-					<label>Heading:</label>
-					<input type="text" name="offset_heading" value="{{.OffsetHeading}}">
-					<label>Distance:</label>
-					<input type="text" name="offset_distance" value="{{.OffsetDistance}}">
-				</div>
-			</div>
-			<div>
 				<h4>Run:</h4>
 				<div>
 					<label>Heading:</label>
@@ -321,6 +327,15 @@ const jumprunHTML = `<html>
 				<div>
 					<label>Exit Distance:<label>
 					<input type="text" name="exit_distance" value="{{.ExitDistance}}">
+				</div>
+			</div>
+			<div>
+				<h4>Offset:</h4>
+				<div>
+					<label>Heading:</label>
+					<input type="text" name="offset_heading" value="{{.OffsetHeading}}">
+					<label>Distance:</label>
+					<input type="text" name="offset_distance" value="{{.OffsetDistance}}">
 				</div>
 			</div>
 			<div>
@@ -342,6 +357,19 @@ const jumprunHTML = `<html>
 				<button type="submit">Submit</button>
 			</div>
 		</form>
+		<script>
+		var form = document.getElementById("jumprun");
+		form.addEventListener("submit", function (e) {
+			var params = {
+				method: "post",
+				body: new FormData(form),
+			};
+			window.fetch(form.action, params).then(function (response) {
+				console.log(response.text());
+			});
+			e.preventDefault();
+		});
+		</script>
 	</body>
 </html>
 `
