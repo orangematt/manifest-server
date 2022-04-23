@@ -307,7 +307,15 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 
 			var slotsAvailable string
 			if l.CallMinutes <= 5 {
-				slotsAvailable = fmt.Sprintf("%d aboard", len(load.Slots))
+				count := 0
+				for _, slot := range load.Slots {
+					if slot.GetJumper() != nil {
+						count++
+					} else if g := slot.GetGroup(); g != nil {
+						count += len(g.GetMembers())
+					}
+				}
+				slotsAvailable = fmt.Sprintf("%d aboard", count)
 			} else if l.SlotsAvailable == 1 {
 				slotsAvailable = "1 slot"
 			} else {
