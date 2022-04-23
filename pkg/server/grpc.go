@@ -312,7 +312,7 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 					if slot.GetJumper() != nil {
 						count++
 					} else if g := slot.GetGroup(); g != nil {
-						count += len(g.GetMembers())
+						count += len(g.GetMembers()) + 1
 					}
 				}
 				slotsAvailable = fmt.Sprintf("%d aboard", count)
