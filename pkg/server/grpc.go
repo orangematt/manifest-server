@@ -284,26 +284,16 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 				}
 			}
 
-			var slotsAvailable string
-			if l.CallMinutes <= 5 {
-				slotsAvailable = fmt.Sprintf("%d aboard", l.SlotsAvailable)
-			} else if l.SlotsAvailable == 1 {
-				slotsAvailable = "1 slot"
-			} else {
-				slotsAvailable = fmt.Sprintf("%d slots", l.SlotsAvailable)
-			}
-
 			load := &Load{
-				Id:                   uint64(l.ID),
-				AircraftName:         l.AircraftName,
-				LoadNumber:           l.LoadNumber,
-				CallMinutes:          int32(l.CallMinutes),
-				CallMinutesString:    callMinutes,
-				SlotsAvailable:       int32(l.SlotsAvailable),
-				SlotsAvailableString: slotsAvailable,
-				IsFueling:            l.IsFueling,
-				IsTurning:            l.IsTurning,
-				IsNoTime:             l.IsNoTime,
+				Id:                uint64(l.ID),
+				AircraftName:      l.AircraftName,
+				LoadNumber:        l.LoadNumber,
+				CallMinutes:       int32(l.CallMinutes),
+				CallMinutesString: callMinutes,
+				SlotsAvailable:    int32(l.SlotsAvailable),
+				IsFueling:         l.IsFueling,
+				IsTurning:         l.IsTurning,
+				IsNoTime:          l.IsNoTime,
 			}
 			for _, j := range l.Tandems {
 				load.Slots = append(load.Slots, s.slotFromJumper(j))
@@ -314,6 +304,16 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			for _, j := range l.SportJumpers {
 				load.Slots = append(load.Slots, s.slotFromJumper(j))
 			}
+
+			var slotsAvailable string
+			if l.CallMinutes <= 5 {
+				slotsAvailable = fmt.Sprintf("%d aboard", len(load.Slots))
+			} else if l.SlotsAvailable == 1 {
+				slotsAvailable = "1 slot"
+			} else {
+				slotsAvailable = fmt.Sprintf("%d slots", l.SlotsAvailable)
+			}
+			load.SlotsAvailableString = slotsAvailable
 
 			u.Loads.Loads = append(u.Loads.Loads, load)
 		}
