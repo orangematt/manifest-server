@@ -307,15 +307,26 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 
 			var slotsAvailable string
 			if l.CallMinutes <= 5 {
-				count := 0
+				// Burble doesn't give us unique Jumper IDs in
+				// the loads even though it surely tracks them
+				// internally. So we have to do the next best
+				// thing and just count unique names. This
+				// should generally work out fine since mostly
+				// duplicate names really only come up when
+				// there is one coach with multiple hop/pop
+				// students
+				names := make(map[string]struct{})
 				for _, slot := range load.Slots {
-					if slot.GetJumper() != nil {
-						count++
+					if j := slot.GetJumper(); j != nil {
+						names[j.Name] = struct{}{}
 					} else if g := slot.GetGroup(); g != nil {
-						count += len(g.GetMembers()) + 1
+						names[g.Leader.Name] = struct{}{}
+						for _, member := range g.GetMembers() {
+							names[member.Name] = struct{}{}
+						}
 					}
 				}
-				slotsAvailable = fmt.Sprintf("%d aboard", count)
+				slotsAvailable = fmt.Sprintf("%d aboard", len(names))
 			} else if l.SlotsAvailable == 1 {
 				slotsAvailable = "1 slot"
 			} else {
