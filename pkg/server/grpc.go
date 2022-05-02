@@ -284,26 +284,16 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 				}
 			}
 
-			var slotsAvailable string
-			if l.CallMinutes <= 5 {
-				slotsAvailable = fmt.Sprintf("%d aboard", l.SlotsAvailable)
-			} else if l.SlotsAvailable == 1 {
-				slotsAvailable = "1 slot"
-			} else {
-				slotsAvailable = fmt.Sprintf("%d slots", l.SlotsAvailable)
-			}
-
 			load := &Load{
-				Id:                   uint64(l.ID),
-				AircraftName:         l.AircraftName,
-				LoadNumber:           l.LoadNumber,
-				CallMinutes:          int32(l.CallMinutes),
-				CallMinutesString:    callMinutes,
-				SlotsAvailable:       int32(l.SlotsAvailable),
-				SlotsAvailableString: slotsAvailable,
-				IsFueling:            l.IsFueling,
-				IsTurning:            l.IsTurning,
-				IsNoTime:             l.IsNoTime,
+				Id:                uint64(l.ID),
+				AircraftName:      l.AircraftName,
+				LoadNumber:        l.LoadNumber,
+				CallMinutes:       int32(l.CallMinutes),
+				CallMinutesString: callMinutes,
+				SlotsAvailable:    int32(l.SlotsAvailable),
+				IsFueling:         l.IsFueling,
+				IsTurning:         l.IsTurning,
+				IsNoTime:          l.IsNoTime,
 			}
 			for _, j := range l.Tandems {
 				load.Slots = append(load.Slots, s.slotFromJumper(j))
@@ -314,6 +304,35 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			for _, j := range l.SportJumpers {
 				load.Slots = append(load.Slots, s.slotFromJumper(j))
 			}
+
+			var slotsAvailable string
+			if l.CallMinutes <= 5 {
+				// Burble doesn't give us unique Jumper IDs in
+				// the loads even though it surely tracks them
+				// internally. So we have to do the next best
+				// thing and just count unique names. This
+				// should generally work out fine since mostly
+				// duplicate names really only come up when
+				// there is one coach with multiple hop/pop
+				// students
+				names := make(map[string]struct{})
+				for _, slot := range load.Slots {
+					if j := slot.GetJumper(); j != nil {
+						names[j.Name] = struct{}{}
+					} else if g := slot.GetGroup(); g != nil {
+						names[g.Leader.Name] = struct{}{}
+						for _, member := range g.GetMembers() {
+							names[member.Name] = struct{}{}
+						}
+					}
+				}
+				slotsAvailable = fmt.Sprintf("%d aboard", len(names))
+			} else if l.SlotsAvailable == 1 {
+				slotsAvailable = "1 slot"
+			} else {
+				slotsAvailable = fmt.Sprintf("%d slots", l.SlotsAvailable)
+			}
+			load.SlotsAvailableString = slotsAvailable
 
 			u.Loads.Loads = append(u.Loads.Loads, load)
 		}
