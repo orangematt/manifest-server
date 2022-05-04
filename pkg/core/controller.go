@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/kelvins/sunrisesunset"
-	"github.com/orangematt/manifest-server/pkg/burble"
-	"github.com/orangematt/manifest-server/pkg/jumprun"
-	"github.com/orangematt/manifest-server/pkg/metar"
-	"github.com/orangematt/manifest-server/pkg/settings"
-	"github.com/orangematt/manifest-server/pkg/winds"
+	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
+	"github.com/jumptown-skydiving/manifest-server/pkg/jumprun"
+	"github.com/jumptown-skydiving/manifest-server/pkg/metar"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/winds"
 )
 
 type DataSource uint64

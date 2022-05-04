@@ -9,9 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/orangematt/manifest-server/pkg/burble"
-	"github.com/orangematt/manifest-server/pkg/core"
-	"github.com/orangematt/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
+	"github.com/jumptown-skydiving/manifest-server/pkg/core"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"

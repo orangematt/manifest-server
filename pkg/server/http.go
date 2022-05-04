@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/orangematt/manifest-server/pkg/core"
+	"github.com/jumptown-skydiving/manifest-server/pkg/core"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"

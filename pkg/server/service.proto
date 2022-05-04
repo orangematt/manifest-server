@@ -3,7 +3,7 @@ package manifest;
 
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/orangematt/manifest-server/pkg/server";
+option go_package = "github.com/jumptown-skydiving/manifest-server/pkg/server";
 
 message Status {
 	string winds = 1;

@@ -1,4 +1,4 @@
-module github.com/orangematt/manifest-server
+module github.com/jumptown-skydiving/manifest-server
 
 go 1.17
 

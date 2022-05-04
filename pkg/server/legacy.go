@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/orangematt/manifest-server/pkg/burble"
-	"github.com/orangematt/manifest-server/pkg/core"
-	"github.com/orangematt/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
+	"github.com/jumptown-skydiving/manifest-server/pkg/core"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 )
 
 type Manifest struct {
