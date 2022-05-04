@@ -13,7 +13,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/orangematt/manifest-server/pkg/server"
+	"github.com/jumptown-skydiving/manifest-server/pkg/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"

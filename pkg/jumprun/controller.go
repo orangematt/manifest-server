@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/orangematt/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 )
 
 type UpdateFunc func()

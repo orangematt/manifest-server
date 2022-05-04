@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/orangematt/manifest-server/pkg/decode"
-	"github.com/orangematt/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/decode"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 )
 
 type Controller struct {

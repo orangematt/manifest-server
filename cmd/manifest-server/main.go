@@ -10,9 +10,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/orangematt/manifest-server/pkg/core"
-	"github.com/orangematt/manifest-server/pkg/server"
-	"github.com/orangematt/manifest-server/pkg/settings"
+	"github.com/jumptown-skydiving/manifest-server/pkg/core"
+	"github.com/jumptown-skydiving/manifest-server/pkg/server"
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 
 	"golang.org/x/net/publicsuffix"
 )
