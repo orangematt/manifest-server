@@ -19,7 +19,7 @@ message Status {
 }
 
 message Options {
-	bool display_nicknames = 2;
+	bool display_nicknames = 2 [deprecated = true]; // policy set in burble
 	bool display_weather = 3;
 	bool display_winds = 4;
 	string message = 5;
@@ -80,7 +80,7 @@ message Jumper {
 	uint64 id = 1;
 	JumperType type = 2;
 	string name = 3;
-	string nickname = 4;
+	string nickname = 4 [deprecated = true]; // burble no longer provides
 	string short_name = 5;
 	uint32 color = 6;
 	string repr = 7;

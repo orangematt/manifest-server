@@ -7,7 +7,6 @@ import "strings"
 type Jumper struct {
 	ID             int64     `json:"id"`
 	Name           string    `json:"name"`
-	Nickname       string    `json:"nickname"`
 	ShortName      string    `json:"short_name"`
 	RigName        string    `json:"rig_name"`
 	IsInstructor   bool      `json:"is_instructor"`
@@ -17,19 +16,15 @@ type Jumper struct {
 	GroupMembers   []*Jumper `json:"group_members"`
 }
 
-func NewJumper(id int64, name, nickname, shortName string) *Jumper {
+func NewJumper(id int64, name, shortName string) *Jumper {
 	j := &Jumper{
 		ID:        id,
 		Name:      strings.TrimSpace(name),
-		Nickname:  strings.TrimSpace(nickname),
 		ShortName: strings.TrimSpace(shortName),
 	}
 
 	if strings.HasPrefix(strings.ToLower(j.Name), "jm ") {
 		j.Name = strings.TrimSpace(j.Name[3:])
-	}
-	if strings.HasPrefix(strings.ToLower(j.Nickname), "jm ") {
-		j.Nickname = strings.TrimSpace(j.Nickname[3:])
 	}
 	if strings.ToLower(j.ShortName) == "vs" {
 		j.ShortName = "Video"

@@ -30,7 +30,6 @@ var defaults = map[string]interface{}{
 }
 
 var defaultOptions = Options{
-	DisplayNicknames: true,
-	DisplayWeather:   true,
-	DisplayWinds:     true,
+	DisplayWeather: true,
+	DisplayWinds:   true,
 }
