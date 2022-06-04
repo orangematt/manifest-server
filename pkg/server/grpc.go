@@ -77,27 +77,22 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 		}
 	}
 
-	var name, repr string
-	if s.options.DisplayNicknames && j.Nickname != "" {
-		name = j.Nickname
-	} else {
-		name = j.Name
-	}
+	var repr string
 	if leader == nil {
 		switch {
 		case j.IsTandem:
-			repr = "Tandem: " + name
+			repr = "Tandem: " + j.Name
 		case prefix != "":
 			shortName := j.ShortName
 			if rigName := j.RigName; rigName != "" {
 				shortName = fmt.Sprintf("%s / %s", shortName, rigName)
 			}
-			repr = fmt.Sprintf("%s: %s (%s)", prefix, name, shortName)
+			repr = fmt.Sprintf("%s: %s (%s)", prefix, j.Name, shortName)
 		default:
-			repr = fmt.Sprintf("%s (%s)", name, j.ShortName)
+			repr = fmt.Sprintf("%s (%s)", j.Name, j.ShortName)
 		}
 	} else {
-		repr = fmt.Sprintf("\t%s (%s)", name, j.ShortName)
+		repr = fmt.Sprintf("\t%s (%s)", j.Name, j.ShortName)
 	}
 
 	t := JumperType_EXPERIENCED
@@ -133,7 +128,6 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 		Type:      t,
 		Name:      j.Name,
 		ShortName: j.ShortName,
-		Nickname:  j.Nickname,
 		Color:     color,
 		Repr:      repr,
 		RigName:   j.RigName,
@@ -173,11 +167,10 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 		s.options = s.app.Settings().Options()
 		o := s.options
 		u.Options = &Options{
-			DisplayNicknames: o.DisplayNicknames,
-			DisplayWeather:   o.DisplayWeather,
-			DisplayWinds:     o.DisplayWinds,
-			Message:          o.Message,
-			MessageColor:     0xffffff,
+			DisplayWeather: o.DisplayWeather,
+			DisplayWinds:   o.DisplayWinds,
+			Message:        o.Message,
+			MessageColor:   0xffffff,
 		}
 		if source&sunriseSources != 0 {
 			u.Options.Sunrise = s.app.SunriseMessage()

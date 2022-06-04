@@ -119,7 +119,7 @@ func (s *Settings) NewHTTPRequest(
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/11.0.3 Safari/605.1.15")
+	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15")
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	return request, err
 }
@@ -233,10 +233,6 @@ const settingsHTML = `<html>
 			<h3>Settings</h3>
 			<hr>
 			<br>
-		</div>
-		<div>
-			<input type="checkbox" id="DisplayNicknames" onchange="change('DisplayNicknames');" {{if .DisplayNicknames}}checked{{end}}>
-			<label>Display nicknames instead of real names</label>
 		</div>
 		<div>
 			<input type="checkbox" id="DisplayWeather" onchange="change('DisplayWeather');" {{if .DisplayWeather}}checked{{end}}>

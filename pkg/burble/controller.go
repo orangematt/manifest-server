@@ -21,7 +21,7 @@ import (
 const (
 	burbleBaseURL     = "https://dzm.burblesoft.com"
 	burblePublicURL   = burbleBaseURL + "/jmp"
-	burbleManifestURL = burbleBaseURL + "/ajax_staff_jumpermanifestpublic"
+	burbleManifestURL = burbleBaseURL + "/ajax_dzm2_frontend_jumpermanifestpublic"
 	burbleNumColumns  = 6 // # columns to ask Burble for
 )
 
@@ -121,9 +121,13 @@ func (c *Controller) Refresh() (bool, error) {
 			continue
 		}
 
-		// Ignore loads that are not public
-		if !decode.Bool("is_public", loadData["is_public"]) {
-			continue
+		// Ignore loads that are not public. The old format had this
+		// field, but the new format does not. Honor it if it comes
+		// back.
+		if isPublic, ok := loadData["is_public"]; ok {
+			if !decode.Bool("is_public", isPublic) {
+				continue
+			}
 		}
 
 		l := Load{
@@ -137,7 +141,13 @@ func (c *Controller) Refresh() (bool, error) {
 			l.IsNoTime = true
 		}
 
+		// aircraft_name seems to always be "" in the new format
 		name := loadData["name"].(string)
+		if l.AircraftName == "" {
+			if x := strings.LastIndex(name, " "); x != -1 {
+				l.AircraftName = name[:x]
+			}
+		}
 		l.LoadNumber = strings.TrimSpace(name[len(l.AircraftName)+1:])
 
 		// Reporting of available slots seems to be something Burble has
@@ -156,15 +166,12 @@ func (c *Controller) Refresh() (bool, error) {
 		for _, rawGroupData := range groups {
 			members := rawGroupData.([]interface{})
 			memberData := members[0].(map[string]interface{})
-			name = memberData["first_name"].(string) + " " +
-				memberData["last_name"].(string)
-			nickname := memberData["name"].(string)
+			name = memberData["name"].(string)
 			primaryID := decode.Int("id", memberData["id"])
 			primaryJumper := NewJumper(
 				primaryID,
 				name,
-				nickname,
-				memberData["short_name"].(string))
+				memberData["jump"].(string))
 			if rigName, ok := memberData["rig_name"].(string); ok {
 				primaryJumper.RigName = rigName
 			}
@@ -189,18 +196,11 @@ func (c *Controller) Refresh() (bool, error) {
 				if i < 1 {
 					continue
 				}
-				name = fmt.Sprintf("%s %s",
-					memberData["first_name"].(string),
-					memberData["last_name"].(string))
-				if primaryJumper.IsStudent || primaryJumper.IsTandem {
-					nickname = name
-				} else {
-					nickname = memberData["name"].(string)
-				}
+				name = memberData["name"].(string)
 				id := decode.Int("id", memberData["id"])
-				jumper := NewJumper(id, name, nickname,
-					memberData["short_name"].(string))
-				if _, ok = memberData["handycam_jump"].(string); ok {
+				jumper := NewJumper(id, name,
+					memberData["jump"].(string))
+				if s, ok := memberData["handycam_jump"].(string); ok && s != "" {
 					jumper.ShortName = "Handycam"
 				}
 				if rigName, ok := memberData["rig_name"].(string); ok {
