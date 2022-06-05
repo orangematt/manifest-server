@@ -176,7 +176,7 @@ func (c *Controller) Refresh() (bool, error) {
 			if rigName, ok := memberData["rig_name"].(string); ok {
 				primaryJumper.RigName = rigName
 			}
-			if groupName, ok := memberData["group_name"].(string); ok {
+			if groupName, ok := memberData["group_number"].(string); ok {
 				if x := strings.LastIndexByte(groupName, '-'); x != -1 {
 					groupName = groupName[:x]
 				}
@@ -213,7 +213,7 @@ func (c *Controller) Refresh() (bool, error) {
 				if rigName, ok := memberData["rig_name"].(string); ok {
 					jumper.RigName = rigName
 				}
-				if groupName, ok := memberData["group_name"].(string); ok {
+				if groupName, ok := memberData["group_number"].(string); ok {
 					if x := strings.LastIndexByte(groupName, '-'); x != -1 {
 						groupName = groupName[:x]
 					}
