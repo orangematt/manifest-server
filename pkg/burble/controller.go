@@ -227,17 +227,18 @@ func (c *Controller) Refresh() (bool, error) {
 		// jumpers that are in the same group.
 		groupNames := make(map[string][]*Jumper)
 		for _, j := range l.SportJumpers {
+			groupName := j.GroupName
 			if j.GroupName == "" {
-				continue
+				groupName = j.Name
 			}
-			groupNames[j.GroupName] = append(groupNames[j.GroupName], j)
+			groupNames[groupName] = append(groupNames[groupName], j)
 		}
 
 		// Empty the SportJumpers list to rebuild it. Iterate over each
 		// unique group to find groups with organizers. Any group that
 		// has no organizer is not treated as a group and all members
 		// are added to the manifest individually.
-		l.SportJumpers = l.SportJumpers[:]
+		l.SportJumpers = make([]*Jumper, 0)
 	outerLoop:
 		for _, members := range groupNames {
 			for _, member := range members {
@@ -252,7 +253,7 @@ func (c *Controller) Refresh() (bool, error) {
 					}
 				}
 				sort.Sort(JumpersByName(organizer.GroupMembers))
-				break outerLoop
+				continue outerLoop
 			}
 			l.SportJumpers = append(l.SportJumpers, members...)
 		}
