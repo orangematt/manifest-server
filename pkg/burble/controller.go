@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
 
@@ -175,6 +176,12 @@ func (c *Controller) Refresh() (bool, error) {
 			if rigName, ok := memberData["rig_name"].(string); ok {
 				primaryJumper.RigName = rigName
 			}
+			if groupName, ok := memberData["group_name"].(string); ok {
+				if x := strings.LastIndexByte(groupName, '-'); x != -1 {
+					groupName = groupName[:x]
+				}
+				primaryJumper.GroupName = groupName
+			}
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
@@ -206,9 +213,57 @@ func (c *Controller) Refresh() (bool, error) {
 				if rigName, ok := memberData["rig_name"].(string); ok {
 					jumper.RigName = rigName
 				}
+				if groupName, ok := memberData["group_name"].(string); ok {
+					if x := strings.LastIndexByte(groupName, '-'); x != -1 {
+						groupName = groupName[:x]
+					}
+					jumper.GroupName = groupName
+				}
 				primaryJumper.AddGroupMember(jumper)
 			}
 		}
+
+		// Group sport jumpers by organizer. Start by building a map of
+		// jumpers that are in the same group.
+		groupNames := make(map[string][]*Jumper)
+		for _, j := range l.SportJumpers {
+			if j.GroupName == "" {
+				continue
+			}
+			groupNames[j.GroupName] = append(groupNames[j.GroupName], j)
+		}
+
+		// Empty the SportJumpers list to rebuild it. Iterate over each
+		// unique group to find groups with organizers. Any group that
+		// has no organizer is not treated as a group and all members
+		// are added to the manifest individually.
+		l.SportJumpers = l.SportJumpers[:]
+	outerLoop:
+		for _, members := range groupNames {
+			for _, member := range members {
+				if !member.IsOrganizer {
+					continue
+				}
+				organizer := member
+				l.SportJumpers = append(l.SportJumpers, organizer)
+				for _, m := range members {
+					if m != organizer {
+						organizer.AddGroupMember(m)
+					}
+				}
+				sort.Sort(JumpersByName(organizer.GroupMembers))
+				break outerLoop
+			}
+			l.SportJumpers = append(l.SportJumpers, members...)
+		}
+
+		// Sort tandems, students, and sport jumpers by name. Burble
+		// used to do this for us, but no longer does. The sort is a
+		// simple lexicographical sort by full name rather than by
+		// locale aware surname.
+		sort.Sort(JumpersByName(l.Tandems))
+		sort.Sort(JumpersByName(l.Students))
+		sort.Sort(JumpersByName(l.SportJumpers))
 
 		// Make private slots count against reserve slots. It
 		// would seem to be the case that PrivateSlots mean

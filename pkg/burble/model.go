@@ -9,11 +9,13 @@ type Jumper struct {
 	Name           string    `json:"name"`
 	ShortName      string    `json:"short_name"`
 	RigName        string    `json:"rig_name"`
+	GroupName      string    `json:"group_name"`
+	GroupMembers   []*Jumper `json:"group_members"`
 	IsInstructor   bool      `json:"is_instructor"`
 	IsTandem       bool      `json:"is_tandem"`
 	IsStudent      bool      `json:"is_student"`
 	IsVideographer bool      `json:"is_videographer"`
-	GroupMembers   []*Jumper `json:"group_members"`
+	IsOrganizer    bool      `json:"is_organizer"`
 }
 
 func NewJumper(id int64, name, shortName string) *Jumper {
@@ -26,9 +28,13 @@ func NewJumper(id int64, name, shortName string) *Jumper {
 	if strings.HasPrefix(strings.ToLower(j.Name), "jm ") {
 		j.Name = strings.TrimSpace(j.Name[3:])
 	}
-	if strings.ToLower(j.ShortName) == "vs" {
+	jump := strings.ToLower(j.ShortName)
+	if jump == "vs" {
 		j.ShortName = "Video"
 		j.IsVideographer = true
+	}
+	if jump == "organizer" {
+		j.IsOrganizer = true
 	}
 
 	return j
@@ -39,6 +45,20 @@ func (j *Jumper) AddGroupMember(member *Jumper) {
 	if (j.IsTandem || j.IsStudent) && !member.IsVideographer {
 		member.IsInstructor = true
 	}
+}
+
+type JumpersByName []*Jumper
+
+func (j JumpersByName) Len() int {
+	return len(j)
+}
+
+func (j JumpersByName) Swap(a, b int) {
+	j[a], j[b] = j[b], j[a]
+}
+
+func (j JumpersByName) Less(a, b int) bool {
+	return strings.ToLower(j[a].Name) < strings.ToLower(j[b].Name)
 }
 
 type Load struct {
