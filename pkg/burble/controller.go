@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/decode"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
@@ -25,6 +26,23 @@ const (
 	burbleManifestURL = burbleBaseURL + "/ajax_dzm2_frontend_jumpermanifestpublic"
 	burbleNumColumns  = 6 // # columns to ask Burble for
 )
+
+func parseGroupName(s string) string {
+	// Strip off suffixes of the form '-##'
+	for {
+		x := strings.LastIndexByte(s, '-')
+		if x == -1 {
+			break
+		}
+		for _, c := range s[x+1:] {
+			if !unicode.IsDigit(c) {
+				return s
+			}
+		}
+		s = s[:x]
+	}
+	return s
+}
 
 type Controller struct {
 	settings    *settings.Settings
@@ -176,11 +194,8 @@ func (c *Controller) Refresh() (bool, error) {
 			if rigName, ok := memberData["rig_name"].(string); ok {
 				primaryJumper.RigName = rigName
 			}
-			if groupName, ok := memberData["group_number"].(string); ok {
-				if x := strings.LastIndexByte(groupName, '-'); x != -1 {
-					groupName = groupName[:x]
-				}
-				primaryJumper.GroupName = groupName
+			if gn, ok := memberData["group_number"].(string); ok {
+				primaryJumper.GroupName = parseGroupName(gn)
 			}
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
@@ -213,11 +228,8 @@ func (c *Controller) Refresh() (bool, error) {
 				if rigName, ok := memberData["rig_name"].(string); ok {
 					jumper.RigName = rigName
 				}
-				if groupName, ok := memberData["group_number"].(string); ok {
-					if x := strings.LastIndexByte(groupName, '-'); x != -1 {
-						groupName = groupName[:x]
-					}
-					jumper.GroupName = groupName
+				if gn, ok := memberData["group_number"].(string); ok {
+					jumper.GroupName = parseGroupName(gn)
 				}
 				primaryJumper.AddGroupMember(jumper)
 			}
@@ -238,7 +250,7 @@ func (c *Controller) Refresh() (bool, error) {
 		// unique group to find groups with organizers. Any group that
 		// has no organizer is not treated as a group and all members
 		// are added to the manifest individually.
-		l.SportJumpers = make([]*Jumper, 0)
+		l.SportJumpers = l.SportJumpers[:0]
 	outerLoop:
 		for _, members := range groupNames {
 			for _, member := range members {

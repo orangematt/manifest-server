@@ -33,7 +33,7 @@ func NewJumper(id int64, name, shortName string) *Jumper {
 		j.ShortName = "Video"
 		j.IsVideographer = true
 	}
-	if jump == "organizer" {
+	if jump == "organizer" || jump == "student org" {
 		j.IsOrganizer = true
 	}
 
