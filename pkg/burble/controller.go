@@ -11,8 +11,10 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/decode"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
@@ -24,6 +26,23 @@ const (
 	burbleManifestURL = burbleBaseURL + "/ajax_dzm2_frontend_jumpermanifestpublic"
 	burbleNumColumns  = 6 // # columns to ask Burble for
 )
+
+func parseGroupName(s string) string {
+	// Strip off suffixes of the form '-##'
+	for {
+		x := strings.LastIndexByte(s, '-')
+		if x == -1 {
+			break
+		}
+		for _, c := range s[x+1:] {
+			if !unicode.IsDigit(c) {
+				return s
+			}
+		}
+		s = s[:x]
+	}
+	return s
+}
 
 type Controller struct {
 	settings    *settings.Settings
@@ -175,6 +194,9 @@ func (c *Controller) Refresh() (bool, error) {
 			if rigName, ok := memberData["rig_name"].(string); ok {
 				primaryJumper.RigName = rigName
 			}
+			if gn, ok := memberData["group_number"].(string); ok {
+				primaryJumper.GroupName = parseGroupName(gn)
+			}
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
@@ -206,9 +228,55 @@ func (c *Controller) Refresh() (bool, error) {
 				if rigName, ok := memberData["rig_name"].(string); ok {
 					jumper.RigName = rigName
 				}
+				if gn, ok := memberData["group_number"].(string); ok {
+					jumper.GroupName = parseGroupName(gn)
+				}
 				primaryJumper.AddGroupMember(jumper)
 			}
 		}
+
+		// Group sport jumpers by organizer. Start by building a map of
+		// jumpers that are in the same group.
+		groupNames := make(map[string][]*Jumper)
+		for _, j := range l.SportJumpers {
+			groupName := j.GroupName
+			if j.GroupName == "" {
+				groupName = j.Name
+			}
+			groupNames[groupName] = append(groupNames[groupName], j)
+		}
+
+		// Empty the SportJumpers list to rebuild it. Iterate over each
+		// unique group to find groups with organizers. Any group that
+		// has no organizer is not treated as a group and all members
+		// are added to the manifest individually.
+		l.SportJumpers = l.SportJumpers[:0]
+	outerLoop:
+		for _, members := range groupNames {
+			for _, member := range members {
+				if !member.IsOrganizer {
+					continue
+				}
+				organizer := member
+				l.SportJumpers = append(l.SportJumpers, organizer)
+				for _, m := range members {
+					if m != organizer {
+						organizer.AddGroupMember(m)
+					}
+				}
+				sort.Sort(JumpersByName(organizer.GroupMembers))
+				continue outerLoop
+			}
+			l.SportJumpers = append(l.SportJumpers, members...)
+		}
+
+		// Sort tandems, students, and sport jumpers by name. Burble
+		// used to do this for us, but no longer does. The sort is a
+		// simple lexicographical sort by full name rather than by
+		// locale aware surname.
+		sort.Sort(JumpersByName(l.Tandems))
+		sort.Sort(JumpersByName(l.Students))
+		sort.Sort(JumpersByName(l.SportJumpers))
 
 		// Make private slots count against reserve slots. It
 		// would seem to be the case that PrivateSlots mean

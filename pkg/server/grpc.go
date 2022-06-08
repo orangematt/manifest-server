@@ -58,12 +58,17 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 		color  uint32
 		prefix string
 	)
+	shortName := j.ShortName
 	if leader != nil {
 		color = leader.Color
 	} else {
 		switch {
 		case j.IsTandem:
 			color = 0xffff00 // yellow
+			if leader == nil {
+				prefix = "Tandem"
+				shortName = ""
+			}
 		case j.IsStudent || strings.HasSuffix(j.ShortName, " + Gear"):
 			color = 0x00ff00 // green
 			if strings.HasSuffix(j.ShortName, " H/P") {
@@ -78,21 +83,19 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 	}
 
 	var repr string
-	if leader == nil {
-		switch {
-		case j.IsTandem:
-			repr = "Tandem: " + j.Name
-		case prefix != "":
-			shortName := j.ShortName
-			if rigName := j.RigName; rigName != "" {
-				shortName = fmt.Sprintf("%s / %s", shortName, rigName)
-			}
-			repr = fmt.Sprintf("%s: %s (%s)", prefix, j.Name, shortName)
-		default:
-			repr = fmt.Sprintf("%s (%s)", j.Name, j.ShortName)
-		}
+	if rigName := j.RigName; rigName != "" {
+		shortName = fmt.Sprintf("%s / %s", shortName, rigName)
+	}
+	if shortName != "" {
+		shortName = " (" + shortName + ")"
+	}
+	if prefix != "" {
+		repr = fmt.Sprintf("%s: %s%s", prefix, j.Name, shortName)
 	} else {
-		repr = fmt.Sprintf("\t%s (%s)", j.Name, j.ShortName)
+		repr = fmt.Sprintf("%s%s", j.Name, shortName)
+	}
+	if leader != nil {
+		repr = "\t" + repr
 	}
 
 	t := JumperType_EXPERIENCED
