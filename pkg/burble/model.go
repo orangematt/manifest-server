@@ -4,6 +4,8 @@ package burble
 
 import "strings"
 
+type ForEachJumperFunc func(j *Jumper)
+
 type Jumper struct {
 	ID             int64     `json:"id"`
 	Name           string    `json:"name"`
@@ -16,6 +18,7 @@ type Jumper struct {
 	IsStudent      bool      `json:"is_student"`
 	IsVideographer bool      `json:"is_videographer"`
 	IsOrganizer    bool      `json:"is_organizer"`
+	IsTurning      bool      `json:"is_turning"`
 }
 
 func NewJumper(id int64, name, shortName string) *Jumper {
@@ -47,6 +50,13 @@ func (j *Jumper) AddGroupMember(member *Jumper) {
 	}
 }
 
+func (j *Jumper) ForEachGroupMember(f ForEachJumperFunc) {
+	for _, member := range j.GroupMembers {
+		f(member)
+		member.ForEachGroupMember(f)
+	}
+}
+
 type JumpersByName []*Jumper
 
 func (j JumpersByName) Len() int {
@@ -73,4 +83,19 @@ type Load struct {
 	Tandems        []*Jumper `json:"tandems"`
 	Students       []*Jumper `json:"students"`
 	SportJumpers   []*Jumper `json:"sport_jumpers"`
+}
+
+func (l *Load) ForEachJumper(f ForEachJumperFunc) {
+	for _, j := range l.Tandems {
+		f(j)
+		j.ForEachGroupMember(f)
+	}
+	for _, j := range l.Students {
+		f(j)
+		j.ForEachGroupMember(f)
+	}
+	for _, j := range l.SportJumpers {
+		f(j)
+		j.ForEachGroupMember(f)
+	}
 }
