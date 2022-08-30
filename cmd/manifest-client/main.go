@@ -45,8 +45,8 @@ func main() {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	serverAddress := "localhost:8080"
-	flag.StringVar(&serverAddress, "addr", "localhost:8080", "specify server address to connect to")
+	serverAddress := "localhost:9090"
+	flag.StringVar(&serverAddress, "addr", "localhost:9090", "specify server address to connect to")
 	flag.Parse()
 
 	// Dial the server

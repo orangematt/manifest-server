@@ -37,13 +37,13 @@ func (s *WebServer) addToManifest(slots []string, jumper *burble.Jumper) []strin
 	} else if jumper.IsStudent || strings.HasSuffix(jumper.ShortName, " + Gear") {
 		color = "#00ff00" // green
 		if jumper.ShortName == "3500 H/P" {
-			prefix = "Hop & Pop"
+			prefix = "H&P"
 		} else if jumper.ShortName == "5500 H/P" {
-			prefix = "Hop & Pop"
+			prefix = "H&P"
 		}
 	} else if strings.HasPrefix(jumper.ShortName, "3-5k") || strings.HasPrefix(jumper.ShortName, "3.5k") {
 		color = "#ff00ff" // magenta
-		prefix = "Hop & Pop"
+		prefix = "H&P"
 	} else {
 		color = "#ffffff" // white
 	}
