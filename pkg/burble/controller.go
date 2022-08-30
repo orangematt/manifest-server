@@ -44,6 +44,31 @@ func parseGroupName(s string) string {
 	return s
 }
 
+func jumperFromJSON(json map[string]interface{}) *Jumper {
+	name := json["name"].(string)
+	id := decode.Int("id", json["id"])
+	shortName := json["jump"].(string)
+	if s, ok := json["handycam_jump"].(string); ok && s != "" {
+		shortName = "Handycam"
+	}
+
+	jumper := NewJumper(id, name, shortName)
+	if gn, ok := json["group_number"].(string); ok {
+		jumper.GroupName = parseGroupName(gn)
+	}
+
+	// use rig_name if it's present, but fallback to broken rig_id instead
+	// rig_id is inconsistent with other name/id fields in the Burble data.
+	// The field used to be rig_name until Burble did a major data revision
+	// and it became rig_id.
+	if rigName, ok := json["rig_name"].(string); ok && rigName != "" {
+		jumper.RigName = rigName
+	} else if rigName, ok = json["rig_id"].(string); ok && rigName != "" {
+		jumper.RigName = rigName
+	}
+	return jumper
+}
+
 type Controller struct {
 	settings    *settings.Settings
 	columnCount int
@@ -185,18 +210,7 @@ func (c *Controller) Refresh() (bool, error) {
 		for _, rawGroupData := range groups {
 			members := rawGroupData.([]interface{})
 			memberData := members[0].(map[string]interface{})
-			name = memberData["name"].(string)
-			primaryID := decode.Int("id", memberData["id"])
-			primaryJumper := NewJumper(
-				primaryID,
-				name,
-				memberData["jump"].(string))
-			if rigName, ok := memberData["rig_name"].(string); ok {
-				primaryJumper.RigName = rigName
-			}
-			if gn, ok := memberData["group_number"].(string); ok {
-				primaryJumper.GroupName = parseGroupName(gn)
-			}
+			primaryJumper := jumperFromJSON(memberData)
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
@@ -218,19 +232,7 @@ func (c *Controller) Refresh() (bool, error) {
 				if i < 1 {
 					continue
 				}
-				name = memberData["name"].(string)
-				id := decode.Int("id", memberData["id"])
-				jumper := NewJumper(id, name,
-					memberData["jump"].(string))
-				if s, ok := memberData["handycam_jump"].(string); ok && s != "" {
-					jumper.ShortName = "Handycam"
-				}
-				if rigName, ok := memberData["rig_name"].(string); ok {
-					jumper.RigName = rigName
-				}
-				if gn, ok := memberData["group_number"].(string); ok {
-					jumper.GroupName = parseGroupName(gn)
-				}
+				jumper := jumperFromJSON(memberData)
 				primaryJumper.AddGroupMember(jumper)
 			}
 		}
