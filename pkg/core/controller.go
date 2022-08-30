@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kelvins/sunrisesunset"
 	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
 	"github.com/jumptown-skydiving/manifest-server/pkg/jumprun"
 	"github.com/jumptown-skydiving/manifest-server/pkg/metar"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 	"github.com/jumptown-skydiving/manifest-server/pkg/winds"
+	"github.com/kelvins/sunrisesunset"
 )
 
 type DataSource uint64
@@ -288,14 +288,14 @@ func (c *Controller) SunriseMessage() string {
 
 	dzTimeNow := c.CurrentTime()
 	if dzTimeNow.Before(sunrise) {
-		delta := sunrise.Sub(dzTimeNow).Minutes()
+		delta := int(sunrise.Sub(dzTimeNow).Minutes())
 		switch {
 		case delta == 1:
 			return "Sunrise is in 1 minute"
 		case delta == 60:
 			return "Sunrise is in 1 hour"
 		case delta > 1 && delta < 60:
-			return fmt.Sprintf("Sunrise is in %d minutes", int(delta))
+			return fmt.Sprintf("Sunrise is in %d minutes", delta)
 		}
 	}
 	return ""
@@ -309,14 +309,14 @@ func (c *Controller) SunsetMessage() string {
 
 	dzTimeNow := c.CurrentTime()
 	if dzTimeNow.Before(sunset) {
-		delta := sunset.Sub(dzTimeNow).Minutes()
+		delta := int(sunset.Sub(dzTimeNow).Minutes())
 		switch {
 		case delta == 1:
 			return "Sunset is in 1 minute"
 		case delta == 60:
 			return "Sunset is in 1 hour"
 		case delta > 1 && delta < 60:
-			return fmt.Sprintf("Sunset is in %d minutes", int(delta))
+			return fmt.Sprintf("Sunset is in %d minutes", delta)
 		}
 	}
 	return ""
