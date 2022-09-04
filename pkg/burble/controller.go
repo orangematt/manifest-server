@@ -302,7 +302,7 @@ func (c *Controller) Refresh() (bool, error) {
 		thisLoad.ForEachJumper(func(thisJumper *Jumper) {
 			nextLoad.ForEachJumper(func(nextJumper *Jumper) {
 				if thisJumper.Name == nextJumper.Name {
-					thisJumper.IsTurning = true
+					nextJumper.IsTurning = true
 				}
 			})
 		})
