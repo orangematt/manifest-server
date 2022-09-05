@@ -71,7 +71,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 		func() { c.WakeListeners(BurbleDataSource) })
 
 	if c.settings.METAREnabled() {
-		c.metarSource = metar.NewController(c.settings.METARStation())
+		c.metarSource = metar.NewController(c.settings)
 		c.launchDataSource(
 			func() time.Time { return time.Now().Add(5 * time.Minute) },
 			"METAR",
