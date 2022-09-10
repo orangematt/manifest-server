@@ -94,6 +94,9 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 	} else {
 		repr = fmt.Sprintf("%s%s", j.Name, shortName)
 	}
+	if j.IsTurning {
+		repr = "♻️ " + repr
+	}
 	if leader != nil {
 		repr = "\t" + repr
 	}

@@ -300,6 +300,18 @@ func (c *Controller) Refresh() (bool, error) {
 		loads = append(loads, &l)
 	}
 
+	for i := 0; i < len(loads)-1; i++ {
+		thisLoad := loads[i]
+		nextLoad := loads[i+1]
+		thisLoad.ForEachJumper(func(thisJumper *Jumper) {
+			nextLoad.ForEachJumper(func(nextJumper *Jumper) {
+				if thisJumper.Name == nextJumper.Name {
+					nextJumper.IsTurning = true
+				}
+			})
+		})
+	}
+
 	// Delete loads with CallMinutes older than our minimum setting
 	minCallMinutes := c.settings.MinCallMinutes()
 	var finalLoads []*Load
