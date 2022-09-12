@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -154,6 +155,16 @@ func (s *Settings) SetFromURLValues(values url.Values) bool {
 					s.update(k)
 				}
 			}
+		case reflect.Int:
+			o := fv.Int()
+			n, err := strconv.ParseInt(v[0], 0, 64)
+			if err == nil && o != n {
+				changed = true
+				fv.SetInt(n)
+				if s.update != nil {
+					s.update(k)
+				}
+			}
 		case reflect.String:
 			o := fv.String()
 			n := v[0]
@@ -241,6 +252,14 @@ const settingsHTML = `<html>
 		<div>
 			<input type="checkbox" id="DisplayWinds" onchange="change('DisplayWinds');" {{if .DisplayWinds}}checked{{end}}>
 			<label>Display winds aloft information<label>
+		</div>
+		<div>
+			<label># Manifest loads to display:<label>
+			<input type="text" id="DisplayColumns" onchange="change('DisplayColumns');" value="{{.DispalyColumns}}">
+		</div>
+		<div>
+			<label>Minimum call time to display:<label>
+			<input type="text" id="MinCallMinutes" onchange="change('MinCallMinutes');" value="{{.MinCallMinutes}}">
 		</div>
 		<div>
 			<label>Message:</label>
