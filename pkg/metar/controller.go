@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 )
 
 // FahrenheitFromCelsius converts a temperature from Celsius to Fahrenheit.
@@ -125,7 +127,7 @@ func weatherCondition(wx string) string {
 }
 
 type Controller struct {
-	station string
+	settings *settings.Settings
 
 	lock        sync.Mutex
 	fields      map[string]interface{}
@@ -133,9 +135,9 @@ type Controller struct {
 	wxCondition string
 }
 
-func NewController(station string) *Controller {
+func NewController(settings *settings.Settings) *Controller {
 	return &Controller{
-		station: station,
+		settings: settings,
 	}
 }
 
@@ -143,7 +145,7 @@ const metarURL = "https://aviationweather.gov/adds/dataserver_current/httpparam?
 
 // Refresh retrieves and parses weather data.
 func (c *Controller) Refresh() (bool, error) {
-	url := fmt.Sprintf("%s&stationString=%s", metarURL, c.station)
+	url := fmt.Sprintf("%s&stationString=%s", metarURL, c.settings.METARStation())
 	resp, err := http.Get(url)
 	if err != nil {
 		return false, err
@@ -310,7 +312,8 @@ func (c *Controller) WindDirectionDegrees() float64 {
 		return 0.0
 	}
 	// Adjust true north to magnetic north. Magnetic deviance for Orange, MA is -14.7
-	return float64((int(windDirectionDegrees) - 14 + 360) % 360)
+	// This is a little gross, but use jumprun's magnetic declination setting
+	return float64((int(windDirectionDegrees) + c.settings.JumprunMagneticDeclination() + 360) % 360)
 }
 
 // WindConditions returns the current wind conditions as a human-readable string.

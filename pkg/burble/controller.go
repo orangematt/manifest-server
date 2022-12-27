@@ -24,7 +24,6 @@ const (
 	burbleBaseURL     = "https://dzm.burblesoft.com"
 	burblePublicURL   = burbleBaseURL + "/jmp"
 	burbleManifestURL = burbleBaseURL + "/ajax_dzm2_frontend_jumpermanifestpublic"
-	burbleNumColumns  = 6 // # columns to ask Burble for
 )
 
 func parseGroupName(s string) string {
@@ -118,6 +117,11 @@ func (c *Controller) Refresh() (bool, error) {
 		}
 	}
 
+	// Ask Burble for the number of columns we want to display + 1
+	// Do this so that we can filter out loads older tha min call minutes,
+	// but still be able to determine which jumpers are turning.
+	burbleNumColumns := c.settings.DisplayColumns() + 1
+
 	dzid := c.settings.BurbleDropzoneID()
 	bodyString := fmt.Sprintf("aircraft=0&columns=%d&display_tandem=1&display_student=1&display_sport=1&display_menu=0&font_size=0&action=getLoads&dz_id=%d&date_format=m%%2Fd%%2FY&acl_application=Burble%%20DZM", burbleNumColumns, dzid)
 	body := bytes.NewReader([]byte(bodyString))
@@ -158,7 +162,7 @@ func (c *Controller) Refresh() (bool, error) {
 	}
 
 	sourceLoads := burbleData["loads"].([]interface{})
-	columnCount := len(sourceLoads)
+	columnCount := burbleNumColumns - 1
 	for _, rawLoadData := range sourceLoads {
 		loadData, ok := rawLoadData.(map[string]interface{})
 		if !ok {
@@ -296,6 +300,30 @@ func (c *Controller) Refresh() (bool, error) {
 		loads = append(loads, &l)
 	}
 
+	for i := 0; i < len(loads)-1; i++ {
+		thisLoad := loads[i]
+		nextLoad := loads[i+1]
+		thisLoad.ForEachJumper(func(thisJumper *Jumper) {
+			nextLoad.ForEachJumper(func(nextJumper *Jumper) {
+				if thisJumper.Name == nextJumper.Name {
+					nextJumper.IsTurning = true
+				}
+			})
+		})
+	}
+
+	// Delete loads with CallMinutes older than our minimum setting
+	minCallMinutes := c.settings.MinCallMinutes()
+	var finalLoads []*Load
+	for _, load := range loads {
+		if int(load.CallMinutes) >= minCallMinutes {
+			finalLoads = append(finalLoads, load)
+			if len(finalLoads) >= columnCount {
+				break
+			}
+		}
+	}
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -304,8 +332,8 @@ func (c *Controller) Refresh() (bool, error) {
 		c.columnCount = columnCount
 		changed = true
 	}
-	if !reflect.DeepEqual(c.loads, loads) {
-		c.loads = loads
+	if !reflect.DeepEqual(c.loads, finalLoads) {
+		c.loads = finalLoads
 		changed = true
 	}
 

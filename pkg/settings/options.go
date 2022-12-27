@@ -5,6 +5,8 @@ package settings
 type Options struct {
 	DisplayWeather bool   `json:"display_weather"`
 	DisplayWinds   bool   `json:"display_winds"`
+	DisplayColumns int    `json:"display_columns"`
+	MinCallMinutes int    `json:"min_call_minutes"`
 	Message        string `json:"message"`
 }
 
@@ -24,4 +26,16 @@ func (s *Settings) DisplayWinds() bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	return s.options.DisplayWinds
+}
+
+func (s *Settings) DisplayColumns() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.options.DisplayColumns
+}
+
+func (s *Settings) MinCallMinutes() int {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.options.MinCallMinutes
 }
