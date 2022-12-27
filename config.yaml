@@ -9,6 +9,10 @@ server:
 
 burble:
   dzid: 417
+  organizer_strings:
+    - "organizer"
+    - "student org"
+    - "aff - evaluator"
 
 metar:
   enabled: true
