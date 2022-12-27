@@ -164,6 +164,7 @@ func (c *Controller) Refresh() (bool, error) {
 		return false, errors.New("Burble data is missing load information")
 	}
 
+	organizerStrings := c.settings.OrganizerStrings()
 	sourceLoads := burbleData["loads"].([]interface{})
 	columnCount := burbleNumColumns - 1
 	for _, rawLoadData := range sourceLoads {
@@ -218,6 +219,15 @@ func (c *Controller) Refresh() (bool, error) {
 			members := rawGroupData.([]interface{})
 			memberData := members[0].(map[string]interface{})
 			primaryJumper := jumperFromJSON(memberData)
+
+			jump := strings.ToLower(primaryJumper.ShortName)
+			for _, o := range organizerStrings {
+				if jump == o {
+					primaryJumper.IsOrganizer = true
+					break
+				}
+			}
+
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
