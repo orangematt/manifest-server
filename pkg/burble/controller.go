@@ -60,9 +60,12 @@ func jumperFromJSON(json map[string]interface{}) *Jumper {
 	// rig_id is inconsistent with other name/id fields in the Burble data.
 	// The field used to be rig_name until Burble did a major data revision
 	// and it became rig_id.
+	// Update: Looks like Burble fixed this at some point over the summer.
+	//         Leave all of this here for now until we can verify the fix,
+	//         but add an additional "0" check for "rig_id"
 	if rigName, ok := json["rig_name"].(string); ok && rigName != "" {
 		jumper.RigName = rigName
-	} else if rigName, ok = json["rig_id"].(string); ok && rigName != "" {
+	} else if rigName, ok = json["rig_id"].(string); ok && rigName != "" && rigName != "0" {
 		jumper.RigName = rigName
 	}
 	return jumper
