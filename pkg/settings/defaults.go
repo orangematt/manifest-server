@@ -32,4 +32,6 @@ var defaults = map[string]interface{}{
 var defaultOptions = Options{
 	DisplayWeather: true,
 	DisplayWinds:   true,
+	DisplayColumns: 5,
+	MinCallMinutes: -10,
 }

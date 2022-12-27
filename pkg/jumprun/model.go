@@ -3,7 +3,6 @@
 package jumprun
 
 import (
-	"bytes"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -26,24 +25,6 @@ type Jumprun struct {
 	MagneticDeclination int     `json:"magnetic_declination"` // magnetic declination at origin
 	CameraHeight        int     `json:"camera_height"`        // camera height to use for view
 	IsSet               bool    `json:"is_set"`               // true if jumprun is set
-}
-
-func (j *Jumprun) LegacyContent() []byte {
-	b := bytes.Buffer{}
-
-	if !j.IsSet {
-		b.WriteString("unset\n")
-	} else {
-		b.WriteString(fmt.Sprintf("%d %d %d %d\n", j.Heading, j.ExitDistance, j.OffsetHeading, j.OffsetDistance))
-		for _, turn := range j.HookTurns {
-			if turn.Heading == 0 && turn.Distance == 0 {
-				break
-			}
-			b.WriteString(fmt.Sprintf("%d %d\n", turn.Heading, turn.Distance))
-		}
-	}
-
-	return b.Bytes()
 }
 
 func (j *Jumprun) getIntValue(values url.Values, key string, defaultValue int) (int, error) {

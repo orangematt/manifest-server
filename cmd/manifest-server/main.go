@@ -39,8 +39,6 @@ func newWebServer(app *core.Controller) (*server.WebServer, error) {
 		webServer.SetContentFunc("/setjumprun", jumprun.FormHandler)
 	}
 
-	webServer.EnableLegacySupport()
-
 	return webServer, nil
 }
 
