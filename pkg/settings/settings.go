@@ -5,6 +5,7 @@ package settings
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -81,9 +82,33 @@ func (s *Settings) restore() error {
 		return err
 	}
 
-	var newOptions Options
-	if err = json.Unmarshal(dataBytes, &newOptions); err != nil {
+	var rawOptions interface{}
+	if err = json.Unmarshal(dataBytes, &rawOptions); err != nil {
 		return err
+	}
+	optionsMap, typeok := rawOptions.(map[string]interface{})
+	if !typeok {
+		return errors.New("invalid options format")
+	}
+
+	newOptions := defaultOptions
+	newOptionsValue := reflect.ValueOf(&newOptions)
+	t := reflect.TypeOf(newOptions)
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		key, ok := f.Tag.Lookup("json")
+		if !ok {
+			continue
+		}
+		if x := strings.IndexByte(key, ','); x != -1 {
+			key = key[:x]
+		}
+		value, ok := optionsMap[key]
+		if !ok {
+			continue
+		}
+		v := newOptionsValue.Elem().Field(i)
+		v.Set(reflect.ValueOf(value).Convert(v.Type()))
 	}
 
 	s.lock.Lock()
