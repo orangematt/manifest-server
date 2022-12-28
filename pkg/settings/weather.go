@@ -14,6 +14,10 @@ func (s *Settings) WindsLongitude() string {
 	return s.config.GetString("winds.longitude")
 }
 
+func (s *Settings) WindsReferrer() string {
+	return s.config.GetString("winds.referrer")
+}
+
 func (s *Settings) METAREnabled() bool {
 	return s.config.GetBool("metar.enabled")
 }

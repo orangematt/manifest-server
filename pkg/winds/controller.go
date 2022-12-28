@@ -34,15 +34,18 @@ type Controller struct {
 	lock sync.Mutex
 }
 
+// Winds Aloft data requires a referral code from Mark Schulze. Please contact
+// him and configure the referrer code in your config.yaml
 const windsAloftURL = "https://markschulze.net/winds/winds.php?hourOffset=0"
 
 func NewController(settings *settings.Settings) *Controller {
 	latitude := settings.WindsLatitude()
 	longitude := settings.WindsLongitude()
+	referrer := settings.WindsReferrer()
 	wa := &Controller{
 		settings: settings,
-		url: fmt.Sprintf("%s&lat=%s&lon=%s", windsAloftURL, latitude,
-			longitude),
+		url: fmt.Sprintf("%s&lat=%s&lon=%s&referrer=%s", windsAloftURL,
+			latitude, longitude, referrer),
 	}
 
 	return wa
