@@ -3,7 +3,7 @@ all: manifest-server manifest-client
 
 .PHONY: manifest-server
 manifest-server: protos
-	go build -o manifest-server cmd/manifest-server/main.go
+	CGO_ENABLED=1 go build -o manifest-server cmd/manifest-server/main.go
 
 .PHONY: manifest-client
 manifest-client: protos

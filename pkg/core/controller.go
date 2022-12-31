@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
+	"github.com/jumptown-skydiving/manifest-server/pkg/db"
 	"github.com/jumptown-skydiving/manifest-server/pkg/jumprun"
 	"github.com/jumptown-skydiving/manifest-server/pkg/metar"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
@@ -37,6 +38,7 @@ const (
 type Controller struct {
 	mutex sync.Mutex
 
+	db               db.Connection
 	location         *time.Location
 	burbleSource     *burble.Controller
 	jumprun          *jumprun.Controller
@@ -55,6 +57,12 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 		settings:  settings,
 		listeners: make(map[int]chan DataSource),
 		done:      make(chan struct{}),
+	}
+
+	var err error
+	c.db, err = db.Connect(settings)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to initialize database: %w", err)
 	}
 
 	loc, err := settings.Location()
@@ -109,6 +117,7 @@ func (c *Controller) Done() <-chan struct{} {
 func (c *Controller) Close() {
 	close(c.done)
 	c.wg.Wait()
+	c.db.Close()
 }
 
 func (c *Controller) Settings() *settings.Settings {

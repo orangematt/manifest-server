@@ -7,6 +7,10 @@ server:
   grpc_address: ":9090"
   #cert_file: /etc/cert/services.jumptown.com.pem
 
+database:
+  driver: sqlite3
+  filename: /var/lib/manifest-server/database.sqlite3
+
 burble:
   dzid: 417
   organizer_strings:
