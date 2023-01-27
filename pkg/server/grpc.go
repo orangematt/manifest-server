@@ -499,3 +499,120 @@ func (s *manifestServiceServer) StreamUpdates(
 		}
 	}
 }
+
+func (s *manifestServiceServer) SignInWithApple(
+	ctx context.Context,
+	req *SignInWithAppleRequest,
+) (*SignInResponse, error) {
+	m := s.app.SignInWithAppleManager()
+	if m == nil {
+		return &SignInResponse{}, nil
+	}
+
+	id, err := m.VerifyIdentityToken(ctx, req.IdentityToken, req.Nonce)
+	if err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	tx, err := s.app.BeginDatabaseTransaction()
+	if err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	r, err := m.ValidateAuthCode(ctx, req.Nonce, req.AuthorizationCode, "")
+	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
+		return &SignInResponse{}, nil
+	}
+
+	user, err := s.app.CreateUser(tx, id.Subject, req.GivenName,
+		req.FamilyName, id.Email, id.IsPrivateEmail, id.EmailVerified)
+	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
+		return &SignInResponse{}, nil
+	}
+
+	session, err := s.app.NewSession(tx, user, r.AccessToken,
+		r.RefreshToken, r.IdentityToken, req.Nonce, "siwa")
+	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
+		return &SignInResponse{}, nil
+	}
+
+	roles, err := s.app.QueryRoles(tx, user)
+	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
+		return &SignInResponse{}, nil
+	}
+
+	if err = s.app.CommitDatabaseTransaction(tx); err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	return &SignInResponse{
+		SessionId:         session.ID,
+		SessionExpiration: session.ExpireTime.Unix(),
+		IsValid:           true,
+		Roles:             roles,
+	}, nil
+}
+
+func (s *manifestServiceServer) SignOut(
+	ctx context.Context,
+	req *SignOutRequest,
+) (*SignOutResponse, error) {
+	tx, err := s.app.BeginDatabaseTransaction()
+	if err != nil {
+		return &SignOutResponse{}, nil
+	}
+
+	if err = s.app.DeleteSession(ctx, tx, req.SessionId); err != nil {
+		s.app.AbortDatabaseTransaction(tx)
+		return &SignOutResponse{}, nil
+	}
+
+	if err = s.app.CommitDatabaseTransaction(tx); err != nil {
+		return &SignOutResponse{}, nil
+	}
+
+	return &SignOutResponse{
+		SessionId: req.SessionId,
+	}, nil
+}
+
+func (s *manifestServiceServer) VerifySessionID(
+	ctx context.Context,
+	req *VerifySessionRequest,
+) (*SignInResponse, error) {
+	tx, err := s.app.BeginDatabaseTransaction()
+	if err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	session, err := s.app.LookupSession(ctx, tx, req.SessionId)
+	if err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	user, err := s.app.LookupUser(tx, session.UserID)
+	if err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	roles, err := s.app.QueryRoles(tx, user)
+	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
+		return &SignInResponse{}, nil
+	}
+
+	if err = s.app.CommitDatabaseTransaction(tx); err != nil {
+		return &SignInResponse{}, nil
+	}
+
+	return &SignInResponse{
+		SessionId:         session.ID,
+		SessionExpiration: session.ExpireTime.Unix(),
+		IsValid:           true,
+		Roles:             roles,
+	}, nil
+}

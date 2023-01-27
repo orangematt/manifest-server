@@ -11,7 +11,10 @@ require (
 	google.golang.org/protobuf v1.28.1
 )
 
-require github.com/mattn/go-sqlite3 v1.14.16
+require (
+	github.com/mattn/go-sqlite3 v1.14.16
+	github.com/orangematt/siwa v0.0.0-20230122163734-26662f5eb092
+)
 
 require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect

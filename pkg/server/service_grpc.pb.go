@@ -20,6 +20,9 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ManifestServiceClient interface {
 	StreamUpdates(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (ManifestService_StreamUpdatesClient, error)
+	SignInWithApple(ctx context.Context, in *SignInWithAppleRequest, opts ...grpc.CallOption) (*SignInResponse, error)
+	SignOut(ctx context.Context, in *SignOutRequest, opts ...grpc.CallOption) (*SignOutResponse, error)
+	VerifySessionID(ctx context.Context, in *VerifySessionRequest, opts ...grpc.CallOption) (*SignInResponse, error)
 }
 
 type manifestServiceClient struct {
@@ -62,11 +65,41 @@ func (x *manifestServiceStreamUpdatesClient) Recv() (*ManifestUpdate, error) {
 	return m, nil
 }
 
+func (c *manifestServiceClient) SignInWithApple(ctx context.Context, in *SignInWithAppleRequest, opts ...grpc.CallOption) (*SignInResponse, error) {
+	out := new(SignInResponse)
+	err := c.cc.Invoke(ctx, "/manifest.ManifestService/SignInWithApple", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *manifestServiceClient) SignOut(ctx context.Context, in *SignOutRequest, opts ...grpc.CallOption) (*SignOutResponse, error) {
+	out := new(SignOutResponse)
+	err := c.cc.Invoke(ctx, "/manifest.ManifestService/SignOut", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *manifestServiceClient) VerifySessionID(ctx context.Context, in *VerifySessionRequest, opts ...grpc.CallOption) (*SignInResponse, error) {
+	out := new(SignInResponse)
+	err := c.cc.Invoke(ctx, "/manifest.ManifestService/VerifySessionID", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ManifestServiceServer is the server API for ManifestService service.
 // All implementations must embed UnimplementedManifestServiceServer
 // for forward compatibility
 type ManifestServiceServer interface {
 	StreamUpdates(*emptypb.Empty, ManifestService_StreamUpdatesServer) error
+	SignInWithApple(context.Context, *SignInWithAppleRequest) (*SignInResponse, error)
+	SignOut(context.Context, *SignOutRequest) (*SignOutResponse, error)
+	VerifySessionID(context.Context, *VerifySessionRequest) (*SignInResponse, error)
 	mustEmbedUnimplementedManifestServiceServer()
 }
 
@@ -76,6 +109,15 @@ type UnimplementedManifestServiceServer struct {
 
 func (UnimplementedManifestServiceServer) StreamUpdates(*emptypb.Empty, ManifestService_StreamUpdatesServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamUpdates not implemented")
+}
+func (UnimplementedManifestServiceServer) SignInWithApple(context.Context, *SignInWithAppleRequest) (*SignInResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SignInWithApple not implemented")
+}
+func (UnimplementedManifestServiceServer) SignOut(context.Context, *SignOutRequest) (*SignOutResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SignOut not implemented")
+}
+func (UnimplementedManifestServiceServer) VerifySessionID(context.Context, *VerifySessionRequest) (*SignInResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifySessionID not implemented")
 }
 func (UnimplementedManifestServiceServer) mustEmbedUnimplementedManifestServiceServer() {}
 
@@ -111,13 +153,80 @@ func (x *manifestServiceStreamUpdatesServer) Send(m *ManifestUpdate) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _ManifestService_SignInWithApple_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignInWithAppleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManifestServiceServer).SignInWithApple(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/manifest.ManifestService/SignInWithApple",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManifestServiceServer).SignInWithApple(ctx, req.(*SignInWithAppleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManifestService_SignOut_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignOutRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManifestServiceServer).SignOut(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/manifest.ManifestService/SignOut",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManifestServiceServer).SignOut(ctx, req.(*SignOutRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManifestService_VerifySessionID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifySessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManifestServiceServer).VerifySessionID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/manifest.ManifestService/VerifySessionID",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManifestServiceServer).VerifySessionID(ctx, req.(*VerifySessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ManifestService_ServiceDesc is the grpc.ServiceDesc for ManifestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ManifestService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "manifest.ManifestService",
 	HandlerType: (*ManifestServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SignInWithApple",
+			Handler:    _ManifestService_SignInWithApple_Handler,
+		},
+		{
+			MethodName: "SignOut",
+			Handler:    _ManifestService_SignOut_Handler,
+		},
+		{
+			MethodName: "VerifySessionID",
+			Handler:    _ManifestService_VerifySessionID_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "StreamUpdates",

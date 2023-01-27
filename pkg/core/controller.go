@@ -19,6 +19,7 @@ import (
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 	"github.com/jumptown-skydiving/manifest-server/pkg/winds"
 	"github.com/kelvins/sunrisesunset"
+	"github.com/orangematt/siwa"
 )
 
 type DataSource uint64
@@ -45,6 +46,8 @@ type Controller struct {
 	metarSource      *metar.Controller
 	windsAloftSource *winds.Controller
 
+	siwa *siwa.Manager
+
 	settings   *settings.Settings
 	listeners  map[int]chan DataSource
 	listenerID int
@@ -60,6 +63,11 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 	}
 
 	var err error
+	c.siwa, err = settings.NewSignInWithAppleManager()
+	if err != nil {
+		return nil, err
+	}
+
 	c.db, err = db.Connect(settings)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to initialize database: %w", err)
@@ -142,6 +150,10 @@ func (c *Controller) METARSource() *metar.Controller {
 
 func (c *Controller) WindsAloftSource() *winds.Controller {
 	return c.windsAloftSource
+}
+
+func (c *Controller) SignInWithAppleManager() *siwa.Manager {
+	return c.siwa
 }
 
 func (c *Controller) CurrentTime() time.Time {
