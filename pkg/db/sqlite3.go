@@ -119,13 +119,23 @@ func (db *SQLite3) userFromRow(r *sql.Row) (*User, error) {
 	}
 
 	var (
-		u  User
-		ui userSQLite3
+		u                            User
+		ui                           userSQLite3
+		givenName, familyName, email sql.NullString
 	)
-	err := r.Scan(&ui.rowid, &u.ID, &u.GivenName, &u.FamilyName, &u.Email,
+	err := r.Scan(&ui.rowid, &u.ID, &givenName, &familyName, &email,
 		&u.IsPrivateEmail, &u.IsEmailVerified, &u.CreateTime)
 	if err != nil {
 		return nil, err
+	}
+	if givenName.Valid {
+		u.GivenName = givenName.String
+	}
+	if familyName.Valid {
+		u.FamilyName = familyName.String
+	}
+	if email.Valid {
+		u.Email = email.String
 	}
 	u.db = ui
 	return &u, nil
