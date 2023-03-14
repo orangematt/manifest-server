@@ -3,9 +3,12 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"os"
 	"reflect"
 	"strconv"
@@ -56,7 +59,7 @@ type Controller struct {
 }
 
 func NewController(settings *settings.Settings) (*Controller, error) {
-	c := Controller{
+	c := &Controller{
 		settings:  settings,
 		listeners: make(map[int]chan DataSource),
 		done:      make(chan struct{}),
@@ -67,6 +70,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.siwa.SetDelegate(c)
 
 	c.db, err = db.Connect(settings)
 	if err != nil {
@@ -115,7 +119,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 		c.runAtSunriseSunset()
 	}()
 
-	return &c, nil
+	return c, nil
 }
 
 func (c *Controller) Done() <-chan struct{} {
@@ -158,6 +162,15 @@ func (c *Controller) SignInWithAppleManager() *siwa.Manager {
 
 func (c *Controller) CurrentTime() time.Time {
 	return time.Now().In(c.Location())
+}
+
+func (c *Controller) NewRequestWithContext(
+	ctx context.Context,
+	method string,
+	url string,
+	body io.Reader,
+) (*http.Request, error) {
+	return c.settings.NewRequestWithContext(ctx, method, url, body)
 }
 
 func (c *Controller) SeparationDelay(speed int) int {
