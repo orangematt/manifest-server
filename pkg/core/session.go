@@ -5,7 +5,8 @@ package core
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/db"
@@ -52,12 +53,14 @@ func (c *Controller) LookupSession(
 ) (*db.Session, error) {
 	session, err := c.db.LookupSession(tx, sessionid)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> %v\n", err)
 		return nil, err
 	}
 
 	now := time.Now()
 	if session.ExpireTime.Before(now) {
 		// session has expired; delete it
+		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> session has expired\n")
 		return nil, c.db.DeleteSession(tx, sessionid)
 	}
 	if session.RefreshTime.Before(now) {
@@ -65,25 +68,36 @@ func (c *Controller) LookupSession(
 		switch session.Provider {
 		case "siwa":
 			if c.siwa == nil {
+				fmt.Fprintf(os.Stderr, "Session token refresh: no Sign In With Apple instance\n")
 				return nil, c.db.DeleteSession(tx, sessionid)
 			}
 			r, err := c.siwa.ValidateRefreshToken(ctx,
 				session.Nonce, session.RefreshToken)
 			if err != nil {
-				if errors.Is(err, siwa.ErrorResponse{}) {
+				if _, ok := err.(siwa.ErrorResponse); ok {
+					fmt.Fprintf(os.Stderr, "Session token refresh SIWA error: %v\n", err)
 					return nil, c.db.DeleteSession(tx, sessionid)
 				}
+				fmt.Fprintf(os.Stderr, "Session token refresh: %v\n", err)
 				return nil, err
 			}
 			// ignore r.ExpiresIn - not sure what we'll get back for
 			// this; it's not well documented by Apple. But Apple
 			// does say do not refresh more than once every 24 hours
-			// so that's what we'll use here
+			// so that's what we'll use here. Looks like 3600 is
+			// what Apple returns here, which is weird.
+			//
+			// Note also that we use session.RefreshToken here
+			// instead of r.RefreshToken. This is because Apple's
+			// servers do not return the refresh token when validing
+			// an existing refresh token, indicating that we should
+			// just keep using the same token forever.
 			expiresIn := 24 * time.Hour
 			err = c.db.UpdateSessionTokens(tx, session,
-				r.AccessToken, r.RefreshToken, r.IdentityToken,
+				r.AccessToken, session.RefreshToken, r.IdentityToken,
 				expiresIn)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Session token refresh update tokens error: %v\n", err)
 				return nil, err
 			}
 		default:
