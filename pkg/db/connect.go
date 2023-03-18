@@ -60,6 +60,7 @@ type Connection interface {
 	) (*User, error)
 	DeleteUser(tx *sql.Tx, userid string) error
 	LookupUser(tx *sql.Tx, userid string) (*User, error)
+	UpdateUserEmail(tx *sql.Tx, userid, email string, isPrivateEmail, forward bool) error
 
 	CreateSession(
 		tx *sql.Tx,
@@ -70,6 +71,7 @@ type Connection interface {
 		provider string,
 	) (*Session, error)
 	DeleteSession(tx *sql.Tx, sessionid string) error
+	DeleteSessionsForUser(tx *sql.Tx, userid string) error
 	LookupSession(tx *sql.Tx, sessionid string) (*Session, error)
 	UpdateSessionTokens(
 		tx *sql.Tx,

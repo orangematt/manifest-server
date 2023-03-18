@@ -53,14 +53,14 @@ func (c *Controller) LookupSession(
 ) (*db.Session, error) {
 	session, err := c.db.LookupSession(tx, sessionid)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> %v\n", err)
+		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> %v\n", sessionid, err)
 		return nil, err
 	}
 
 	now := time.Now()
 	if session.ExpireTime.Before(now) {
 		// session has expired; delete it
-		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> session has expired\n")
+		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> session has expired\n", sessionid)
 		return nil, c.db.DeleteSession(tx, sessionid)
 	}
 	if session.RefreshTime.Before(now) {

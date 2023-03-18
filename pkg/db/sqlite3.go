@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 	nonce TEXT NOT NULL,
 	provider TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS sessions_sessionid ON sessions (sessionid);
+CREATE INDEX IF NOT EXISTS sessions_userid ON sessions (userid);
 `
 
 const createUsersRolesTableSQLite3 = `
@@ -194,6 +195,19 @@ func (db *SQLite3) LookupUser(tx *sql.Tx, userid string) (*User, error) {
 	return db.userFromRow(r)
 }
 
+func (db *SQLite3) UpdateUserEmail(
+	tx *sql.Tx,
+	userid string,
+	email string,
+	isPrivateEmail,
+	forward bool,
+) error {
+	stmt := "UPDATE users SET email = $2, is_private_email = $3 WHERE userid = $1;"
+	_, err := tx.Exec(stmt, userid, email, isPrivateEmail)
+	return err
+
+}
+
 func (db *SQLite3) sessionFromRow(r *sql.Row) (*Session, error) {
 	if err := r.Err(); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -244,6 +258,24 @@ func (db *SQLite3) CreateSession(
 
 func (db *SQLite3) DeleteSession(tx *sql.Tx, sessionid string) error {
 	_, err := tx.Exec("DELETE FROM sessions where sessionid = $1;", sessionid)
+	return err
+}
+
+func (db *SQLite3) DeleteSessionsForUser(tx *sql.Tx, userid string) error {
+	r := tx.QueryRow("SELECT id FROM users WHERE userid = $1;", userid)
+	if err := r.Err(); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
+	var id int64
+	if err := r.Scan(&id); err != nil {
+		return err
+	}
+
+	_, err := tx.Exec("DELETE FROM sessions where userid = SELECT $1;", id)
 	return err
 }
 

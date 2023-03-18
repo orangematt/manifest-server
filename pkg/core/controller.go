@@ -173,6 +173,56 @@ func (c *Controller) NewRequestWithContext(
 	return c.settings.NewRequestWithContext(ctx, method, url, body)
 }
 
+func (c *Controller) DisableEmailForwarding(subject, email string, isPrivateEmail bool) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.UpdateUserEmail(tx, subject, email, isPrivateEmail, false)
+		_ = tx.Commit()
+	}
+}
+
+func (c *Controller) EnableEmailForwarding(subject, email string, isPrivateEmail bool) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.UpdateUserEmail(tx, subject, email, isPrivateEmail, true)
+		_ = tx.Commit()
+	}
+}
+
+func (c *Controller) ConsentRevoked(subject string) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.DeleteSessionsForUser(tx, subject)
+		_ = tx.Commit()
+		fmt.Fprintf(os.Stderr, "Deleted all sessions for userid %s\n", subject)
+	}
+}
+
+func (c *Controller) DeleteAccount(subject string) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.DeleteUser(tx, subject)
+		_ = tx.Commit()
+		fmt.Fprintf(os.Stderr, "Deleted account %s\n", subject)
+	}
+}
+
+func (c *Controller) AppleEventHandler(w http.ResponseWriter, req *http.Request) {
+	/* FIXME stub this out until siwa support for it merges
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+
+	err = c.siwa.ProcessChanges(context.Background(), body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error processing changes from Apple: %v\n", err)
+		http.NotFound(w, req)
+		return
+	}
+	*/
+
+	// write out a blank response; Apple's servers don't care
+	_, _ = w.Write([]byte{'\n'})
+}
+
 func (c *Controller) SeparationDelay(speed int) int {
 	msec := (1852.0 * float64(speed)) / 3600.0
 	ftsec := msec / 0.3048
