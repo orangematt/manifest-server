@@ -58,11 +58,16 @@ func (c *Controller) LookupSession(
 	}
 
 	now := time.Now()
+	/* Ignore session expiration time for now. We'll rely on the refresh
+	   time entirely instead. With providers other than Apple, this might
+	   make more sense, but it doesn't really so much with Apple, and that's
+	   the sole supported provider right now
 	if session.ExpireTime.Before(now) {
 		// session has expired; delete it
 		fmt.Fprintf(os.Stderr, "LookupSession(%q) -> session has expired\n", sessionid)
 		return nil, c.db.DeleteSession(tx, sessionid)
 	}
+	*/
 	if session.RefreshTime.Before(now) {
 		// refresh token has expired; refresh it
 		switch session.Provider {
