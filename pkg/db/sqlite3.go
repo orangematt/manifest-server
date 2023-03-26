@@ -298,7 +298,7 @@ func (db *SQLite3) LookupSession(tx *sql.Tx, sessionid string) (*Session, error)
 
 	si, ok := session.db.(sessionSQLite3)
 	if !ok || si.userid == 0 {
-		return nil, ErrInvalidUserID
+		return nil, ErrInvalidSessionID
 	}
 
 	r = tx.QueryRow("SELECT userid FROM users WHERE id = $1;", si.userid)

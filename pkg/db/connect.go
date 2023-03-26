@@ -46,7 +46,8 @@ type Session struct {
 }
 
 var (
-	ErrInvalidUserID = errors.New("invalid user ID")
+	ErrInvalidUserID    = errors.New("invalid user ID")
+	ErrInvalidSessionID = errors.New("invalid session ID")
 )
 
 type Connection interface {

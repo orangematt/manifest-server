@@ -140,6 +140,8 @@ message SignInResponse {
 	int64 session_expiration = 2;
 	bool is_valid = 3;
 	repeated string roles = 4;
+	string error_message = 5;
+	bool session_deleted = 6;
 }
 
 message SignOutRequest {

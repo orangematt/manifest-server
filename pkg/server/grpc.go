@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,7 +12,9 @@ import (
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
 	"github.com/jumptown-skydiving/manifest-server/pkg/core"
+	"github.com/jumptown-skydiving/manifest-server/pkg/db"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
+	"github.com/orangematt/siwa"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -506,47 +509,63 @@ func (s *manifestServiceServer) SignInWithApple(
 ) (*SignInResponse, error) {
 	m := s.app.SignInWithAppleManager()
 	if m == nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: "Server is not configured to support Sign In With Apple",
+		}, nil
 	}
 
 	id, err := m.VerifyIdentityToken(ctx, req.IdentityToken, req.Nonce)
 	if err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("VerifyIdentityToken: %v", err),
+		}, nil
 	}
 
 	tx, err := s.app.BeginDatabaseTransaction()
 	if err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("BeginDatabaseTransaction: %v", err),
+		}, nil
 	}
 
 	r, err := m.ValidateAuthCode(ctx, req.Nonce, req.AuthorizationCode, "")
 	if err != nil {
 		_ = s.app.AbortDatabaseTransaction(tx)
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("ValidateAuthCode: %v", err),
+		}, nil
 	}
 
 	user, err := s.app.CreateUser(tx, id.Subject, req.GivenName,
 		req.FamilyName, id.Email, id.IsPrivateEmail, id.EmailVerified)
 	if err != nil {
 		_ = s.app.AbortDatabaseTransaction(tx)
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("CreateUser: %v", err),
+		}, nil
 	}
 
 	session, err := s.app.NewSession(tx, user, r.AccessToken,
 		r.RefreshToken, r.IdentityToken, req.Nonce, "siwa")
 	if err != nil {
 		_ = s.app.AbortDatabaseTransaction(tx)
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("NewSession: %v", err),
+		}, nil
 	}
 
 	roles, err := s.app.QueryRoles(tx, user)
 	if err != nil {
 		_ = s.app.AbortDatabaseTransaction(tx)
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("QueryRoles: %v", err),
+		}, nil
 	}
 
 	if err = s.app.CommitDatabaseTransaction(tx); err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("CommitDatabaseTransaction: %v", err),
+		}, nil
 	}
 
 	return &SignInResponse{
@@ -586,27 +605,44 @@ func (s *manifestServiceServer) VerifySessionID(
 ) (*SignInResponse, error) {
 	tx, err := s.app.BeginDatabaseTransaction()
 	if err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("BeginDatabaseTransaction: %v", err),
+		}, nil
 	}
 
 	session, err := s.app.LookupSession(ctx, tx, req.SessionId)
 	if err != nil {
-		return &SignInResponse{}, nil
+		sessionDeleted := false
+		if errors.Is(err, db.ErrInvalidSessionID) {
+			sessionDeleted = true
+		} else if _, ok := err.(siwa.ErrorResponse); ok {
+			sessionDeleted = true
+		}
+		return &SignInResponse{
+			ErrorMessage:   fmt.Sprintf("LookupSession: %v", err),
+			SessionDeleted: sessionDeleted,
+		}, nil
 	}
 
 	user, err := s.app.LookupUser(tx, session.UserID)
 	if err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("LookupUser: %v", err),
+		}, nil
 	}
 
 	roles, err := s.app.QueryRoles(tx, user)
 	if err != nil {
 		_ = s.app.AbortDatabaseTransaction(tx)
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("QueryRoles: %v", err),
+		}, nil
 	}
 
 	if err = s.app.CommitDatabaseTransaction(tx); err != nil {
-		return &SignInResponse{}, nil
+		return &SignInResponse{
+			ErrorMessage: fmt.Sprintf("CommitDatabaseTransaction: %v", err),
+		}, nil
 	}
 
 	return &SignInResponse{
