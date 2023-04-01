@@ -3,9 +3,12 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"os"
 	"reflect"
 	"strconv"
@@ -13,11 +16,13 @@ import (
 	"time"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
+	"github.com/jumptown-skydiving/manifest-server/pkg/db"
 	"github.com/jumptown-skydiving/manifest-server/pkg/jumprun"
 	"github.com/jumptown-skydiving/manifest-server/pkg/metar"
 	"github.com/jumptown-skydiving/manifest-server/pkg/settings"
 	"github.com/jumptown-skydiving/manifest-server/pkg/winds"
 	"github.com/kelvins/sunrisesunset"
+	"github.com/orangematt/siwa"
 )
 
 type DataSource uint64
@@ -37,11 +42,14 @@ const (
 type Controller struct {
 	mutex sync.Mutex
 
+	db               db.Connection
 	location         *time.Location
 	burbleSource     *burble.Controller
 	jumprun          *jumprun.Controller
 	metarSource      *metar.Controller
 	windsAloftSource *winds.Controller
+
+	siwa *siwa.Manager
 
 	settings   *settings.Settings
 	listeners  map[int]chan DataSource
@@ -51,10 +59,22 @@ type Controller struct {
 }
 
 func NewController(settings *settings.Settings) (*Controller, error) {
-	c := Controller{
+	c := &Controller{
 		settings:  settings,
 		listeners: make(map[int]chan DataSource),
 		done:      make(chan struct{}),
+	}
+
+	var err error
+	c.siwa, err = settings.NewSignInWithAppleManager()
+	if err != nil {
+		return nil, err
+	}
+	c.siwa.SetDelegate(c)
+
+	c.db, err = db.Connect(settings)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to initialize database: %w", err)
 	}
 
 	loc, err := settings.Location()
@@ -99,7 +119,7 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 		c.runAtSunriseSunset()
 	}()
 
-	return &c, nil
+	return c, nil
 }
 
 func (c *Controller) Done() <-chan struct{} {
@@ -109,6 +129,7 @@ func (c *Controller) Done() <-chan struct{} {
 func (c *Controller) Close() {
 	close(c.done)
 	c.wg.Wait()
+	c.db.Close()
 }
 
 func (c *Controller) Settings() *settings.Settings {
@@ -135,8 +156,71 @@ func (c *Controller) WindsAloftSource() *winds.Controller {
 	return c.windsAloftSource
 }
 
+func (c *Controller) SignInWithAppleManager() *siwa.Manager {
+	return c.siwa
+}
+
 func (c *Controller) CurrentTime() time.Time {
 	return time.Now().In(c.Location())
+}
+
+func (c *Controller) NewRequestWithContext(
+	ctx context.Context,
+	method string,
+	url string,
+	body io.Reader,
+) (*http.Request, error) {
+	return c.settings.NewRequestWithContext(ctx, method, url, body)
+}
+
+func (c *Controller) DisableEmailForwarding(subject, email string, isPrivateEmail bool) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.UpdateUserEmail(tx, subject, email, isPrivateEmail, false)
+		_ = tx.Commit()
+	}
+}
+
+func (c *Controller) EnableEmailForwarding(subject, email string, isPrivateEmail bool) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.UpdateUserEmail(tx, subject, email, isPrivateEmail, true)
+		_ = tx.Commit()
+	}
+}
+
+func (c *Controller) ConsentRevoked(subject string) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.DeleteSessionsForUser(tx, subject)
+		_ = tx.Commit()
+		fmt.Fprintf(os.Stderr, "Deleted all sessions for userid %s\n", subject)
+	}
+}
+
+func (c *Controller) DeleteAccount(subject string) {
+	if tx, err := c.db.Begin(); err == nil {
+		c.db.DeleteUser(tx, subject)
+		_ = tx.Commit()
+		fmt.Fprintf(os.Stderr, "Deleted account %s\n", subject)
+	}
+}
+
+func (c *Controller) AppleEventHandler(w http.ResponseWriter, req *http.Request) {
+	/* FIXME stub this out until siwa support for it merges
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		http.NotFound(w, req)
+		return
+	}
+
+	err = c.siwa.ProcessChanges(context.Background(), body)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error processing changes from Apple: %v\n", err)
+		http.NotFound(w, req)
+		return
+	}
+	*/
+
+	// write out a blank response; Apple's servers don't care
+	_, _ = w.Write([]byte{'\n'})
 }
 
 func (c *Controller) SeparationDelay(speed int) int {

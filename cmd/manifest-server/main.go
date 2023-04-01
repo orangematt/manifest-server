@@ -39,6 +39,8 @@ func newWebServer(app *core.Controller) (*server.WebServer, error) {
 		webServer.SetContentFunc("/setjumprun", jumprun.FormHandler)
 	}
 
+	webServer.SetContentFunc("/siwa", app.AppleEventHandler)
+
 	return webServer, nil
 }
 

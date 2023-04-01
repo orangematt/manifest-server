@@ -12,6 +12,11 @@ require (
 )
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.16
+	github.com/orangematt/siwa v0.0.0-20230122163734-26662f5eb092
+)
+
+require (
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

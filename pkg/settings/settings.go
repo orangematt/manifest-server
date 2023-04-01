@@ -4,6 +4,7 @@ package settings
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -136,18 +137,27 @@ func (s *Settings) Write() error {
 	return err
 }
 
-func (s *Settings) NewHTTPRequest(
+func (s *Settings) NewRequestWithContext(
+	ctx context.Context,
 	method string,
 	url string,
 	body io.Reader,
 ) (*http.Request, error) {
-	request, err := http.NewRequest(method, url, body)
+	request, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15")
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	return request, err
+}
+
+func (s *Settings) NewHTTPRequest(
+	method string,
+	url string,
+	body io.Reader,
+) (*http.Request, error) {
+	return s.NewRequestWithContext(context.Background(), method, url, body)
 }
 
 func (s *Settings) Options() Options {

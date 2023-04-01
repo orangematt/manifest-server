@@ -19,7 +19,7 @@ message Status {
 }
 
 message Options {
-	bool display_nicknames = 2 [deprecated = true]; // policy set in burble
+	bool display_nicknames = 2;
 	bool display_weather = 3;
 	bool display_winds = 4;
 	string message = 5;
@@ -80,7 +80,7 @@ message Jumper {
 	uint64 id = 1;
 	JumperType type = 2;
 	string name = 3;
-	string nickname = 4 [deprecated = true]; // burble no longer provides
+	string nickname = 4;
 	string short_name = 5;
 	uint32 color = 6;
 	string repr = 7;
@@ -126,6 +126,39 @@ message ManifestUpdate {
 	optional Loads loads = 5;
 }
 
+message SignInWithAppleRequest {
+	string bundle_id = 1;
+	string nonce = 2;
+	string identity_token = 3;
+	string authorization_code = 4;
+	string given_name = 5;
+	string family_name = 6;
+}
+
+message SignInResponse {
+	string session_id = 1;
+	int64 session_expiration = 2;
+	bool is_valid = 3;
+	repeated string roles = 4;
+	string error_message = 5;
+	bool session_deleted = 6;
+}
+
+message SignOutRequest {
+	string session_id = 1;
+}
+
+message SignOutResponse {
+	string session_id = 1;
+}
+
+message VerifySessionRequest {
+	string session_id = 1;
+}
+
 service ManifestService {
-	rpc StreamUpdates(google.protobuf.Empty) returns (stream ManifestUpdate) {};
+	rpc StreamUpdates(google.protobuf.Empty) returns (stream ManifestUpdate);
+	rpc SignInWithApple(SignInWithAppleRequest) returns (SignInResponse);
+	rpc SignOut(SignOutRequest) returns (SignOutResponse);
+	rpc VerifySessionID(VerifySessionRequest) returns (SignInResponse);
 }
