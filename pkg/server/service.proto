@@ -26,6 +26,7 @@ message Options {
 	uint32 messageColor = 6;
 	string sunrise = 7;
 	string sunset = 8;
+	bool fuelRequested = 9;
 }
 
 message JumprunOrigin {
@@ -156,9 +157,18 @@ message VerifySessionRequest {
 	string session_id = 1;
 }
 
+message ToggleFuelRequestedRequest {
+	string session_id = 1;
+}
+
+message ToggleFuelRequestedResponse {
+	string error_message = 1;
+}
+
 service ManifestService {
 	rpc StreamUpdates(google.protobuf.Empty) returns (stream ManifestUpdate);
 	rpc SignInWithApple(SignInWithAppleRequest) returns (SignInResponse);
 	rpc SignOut(SignOutRequest) returns (SignOutResponse);
 	rpc VerifySessionID(VerifySessionRequest) returns (SignInResponse);
+	rpc ToggleFuelRequested(ToggleFuelRequestedRequest) returns (ToggleFuelRequestedResponse);
 }

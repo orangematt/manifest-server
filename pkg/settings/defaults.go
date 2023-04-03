@@ -34,4 +34,5 @@ var defaultOptions = Options{
 	DisplayWinds:   true,
 	DisplayColumns: 5,
 	MinCallMinutes: -10,
+	FuelRequested:  false,
 }

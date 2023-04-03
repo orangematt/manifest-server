@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -180,6 +181,7 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 			DisplayWinds:   o.DisplayWinds,
 			Message:        o.Message,
 			MessageColor:   0xffffff,
+			FuelRequested:  o.FuelRequested,
 		}
 		if source&sunriseSources != 0 {
 			u.Options.Sunrise = s.app.SunriseMessage()
@@ -651,4 +653,43 @@ func (s *manifestServiceServer) VerifySessionID(
 		IsValid:           true,
 		Roles:             roles,
 	}, nil
+}
+
+func (s *manifestServiceServer) ToggleFuelRequested(
+	ctx context.Context,
+	req *ToggleFuelRequestedRequest,
+) (*ToggleFuelRequestedResponse, error) {
+	vreq := VerifySessionRequest{
+		SessionId: req.SessionId,
+	}
+	vresp, err := s.VerifySessionID(ctx, &vreq)
+	if err != nil {
+		return nil, err
+	}
+
+	ok := false
+	for _, role := range vresp.Roles {
+		if role == "admin" || role == "pilot" {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return &ToggleFuelRequestedResponse{
+			ErrorMessage: "Permission Denied",
+		}, nil
+	}
+
+	settings := s.app.Settings()
+	settings.SetFuelRequested(!settings.FuelRequested())
+	if err := settings.Write(); err != nil {
+		errorMessage := fmt.Sprintf("Unable to save settings: %v", err)
+		fmt.Fprintf(os.Stderr, "%s\n", errorMessage)
+		return &ToggleFuelRequestedResponse{
+			ErrorMessage: errorMessage,
+		}, nil
+	} else {
+		s.app.WakeListeners(core.OptionsDataSource)
+		return &ToggleFuelRequestedResponse{}, nil
+	}
 }
