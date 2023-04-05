@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/jumptown-skydiving/manifest-server/pkg/burble"
 	"github.com/jumptown-skydiving/manifest-server/pkg/core"
@@ -692,4 +693,28 @@ func (s *manifestServiceServer) ToggleFuelRequested(
 		s.app.WakeListeners(core.OptionsDataSource)
 		return &ToggleFuelRequestedResponse{}, nil
 	}
+}
+
+func (s *manifestServiceServer) RestartServer(
+	ctx context.Context,
+	req *RestartServerRequest,
+) (*RestartServerResponse, error) {
+	vreq := VerifySessionRequest{
+		SessionId: req.SessionId,
+	}
+	vresp, err := s.VerifySessionID(ctx, &vreq)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, role := range vresp.Roles {
+		if role == "admin" {
+			syscall.Kill(os.Getpid(), syscall.SIGTERM)
+			return &RestartServerResponse{}, nil
+		}
+	}
+
+	return &RestartServerResponse{
+		ErrorMessage: "Permission Denied",
+	}, nil
 }
