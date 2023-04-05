@@ -165,10 +165,19 @@ message ToggleFuelRequestedResponse {
 	string error_message = 1;
 }
 
+message RestartServerRequest {
+	string session_id = 1;
+}
+
+message RestartServerResponse {
+	string error_message = 1;
+}
+
 service ManifestService {
 	rpc StreamUpdates(google.protobuf.Empty) returns (stream ManifestUpdate);
 	rpc SignInWithApple(SignInWithAppleRequest) returns (SignInResponse);
 	rpc SignOut(SignOutRequest) returns (SignOutResponse);
 	rpc VerifySessionID(VerifySessionRequest) returns (SignInResponse);
 	rpc ToggleFuelRequested(ToggleFuelRequestedRequest) returns (ToggleFuelRequestedResponse);
+	rpc RestartServer(RestartServerRequest) returns (RestartServerResponse);
 }

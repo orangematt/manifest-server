@@ -24,6 +24,7 @@ type ManifestServiceClient interface {
 	SignOut(ctx context.Context, in *SignOutRequest, opts ...grpc.CallOption) (*SignOutResponse, error)
 	VerifySessionID(ctx context.Context, in *VerifySessionRequest, opts ...grpc.CallOption) (*SignInResponse, error)
 	ToggleFuelRequested(ctx context.Context, in *ToggleFuelRequestedRequest, opts ...grpc.CallOption) (*ToggleFuelRequestedResponse, error)
+	RestartServer(ctx context.Context, in *RestartServerRequest, opts ...grpc.CallOption) (*RestartServerResponse, error)
 }
 
 type manifestServiceClient struct {
@@ -102,6 +103,15 @@ func (c *manifestServiceClient) ToggleFuelRequested(ctx context.Context, in *Tog
 	return out, nil
 }
 
+func (c *manifestServiceClient) RestartServer(ctx context.Context, in *RestartServerRequest, opts ...grpc.CallOption) (*RestartServerResponse, error) {
+	out := new(RestartServerResponse)
+	err := c.cc.Invoke(ctx, "/manifest.ManifestService/RestartServer", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ManifestServiceServer is the server API for ManifestService service.
 // All implementations must embed UnimplementedManifestServiceServer
 // for forward compatibility
@@ -111,6 +121,7 @@ type ManifestServiceServer interface {
 	SignOut(context.Context, *SignOutRequest) (*SignOutResponse, error)
 	VerifySessionID(context.Context, *VerifySessionRequest) (*SignInResponse, error)
 	ToggleFuelRequested(context.Context, *ToggleFuelRequestedRequest) (*ToggleFuelRequestedResponse, error)
+	RestartServer(context.Context, *RestartServerRequest) (*RestartServerResponse, error)
 	mustEmbedUnimplementedManifestServiceServer()
 }
 
@@ -132,6 +143,9 @@ func (UnimplementedManifestServiceServer) VerifySessionID(context.Context, *Veri
 }
 func (UnimplementedManifestServiceServer) ToggleFuelRequested(context.Context, *ToggleFuelRequestedRequest) (*ToggleFuelRequestedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ToggleFuelRequested not implemented")
+}
+func (UnimplementedManifestServiceServer) RestartServer(context.Context, *RestartServerRequest) (*RestartServerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestartServer not implemented")
 }
 func (UnimplementedManifestServiceServer) mustEmbedUnimplementedManifestServiceServer() {}
 
@@ -239,6 +253,24 @@ func _ManifestService_ToggleFuelRequested_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ManifestService_RestartServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestartServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManifestServiceServer).RestartServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/manifest.ManifestService/RestartServer",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManifestServiceServer).RestartServer(ctx, req.(*RestartServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ManifestService_ServiceDesc is the grpc.ServiceDesc for ManifestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -261,6 +293,10 @@ var ManifestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ToggleFuelRequested",
 			Handler:    _ManifestService_ToggleFuelRequested_Handler,
+		},
+		{
+			MethodName: "RestartServer",
+			Handler:    _ManifestService_RestartServer_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
