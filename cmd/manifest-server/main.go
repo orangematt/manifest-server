@@ -81,12 +81,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Fprintf(os.Stderr, "Server ready to service clients (pid %d)\n", os.Getpid())
+
 	// Wait for shutdown signal
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	<-c
 	signal.Stop(c)
 
+	fmt.Fprintf(os.Stderr, "Server stopping for receipt of termination signal\n")
+
 	app.Close()
 	webServer.Close()
+
+	fmt.Fprintf(os.Stderr, "Server stopped\n")
 }
