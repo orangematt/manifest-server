@@ -55,6 +55,9 @@ func jumperFromJSON(json map[string]interface{}) *Jumper {
 	if gn, ok := json["group_number"].(string); ok {
 		jumper.GroupName = parseGroupName(gn)
 	}
+	if ftn, ok := json["formation_type_name"].(string); ok {
+		jumper.IsPondSwoop = strings.ToLower(ftn) == "pond swoop"
+	}
 
 	// use rig_name if it's present, but fallback to broken rig_id instead
 	// rig_id is inconsistent with other name/id fields in the Burble data.

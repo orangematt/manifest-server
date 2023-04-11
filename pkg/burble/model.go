@@ -19,6 +19,7 @@ type Jumper struct {
 	IsVideographer bool      `json:"is_videographer"`
 	IsOrganizer    bool      `json:"is_organizer"`
 	IsTurning      bool      `json:"is_turning"`
+	IsPondSwoop    bool      `json:"is_pond_swoop"`
 }
 
 func NewJumper(id int64, name, shortName string) *Jumper {
