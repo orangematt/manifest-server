@@ -58,7 +58,7 @@ func newManifestServiceServer(controller *core.Controller) *manifestServiceServe
 	}
 }
 
-func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper) *Jumper {
+func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper, load *burble.Load) *Jumper {
 	var (
 		color  uint32
 		prefix string
@@ -104,7 +104,7 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 	if j.IsPondSwoop {
 		repr = "🏄" + repr
 	}
-	if j.IsTurning {
+	if j.IsTurning && load.IsTurning {
 		repr = "♻️ " + repr
 	}
 	if leader != nil {
@@ -150,20 +150,20 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 	}
 }
 
-func (s *manifestServiceServer) slotFromJumper(j *burble.Jumper) *LoadSlot {
+func (s *manifestServiceServer) slotFromJumper(j *burble.Jumper, load *burble.Load) *LoadSlot {
 	if len(j.GroupMembers) == 0 {
 		return &LoadSlot{
 			Slot: &LoadSlot_Jumper{
-				Jumper: s.translateJumper(j, nil),
+				Jumper: s.translateJumper(j, nil, load),
 			},
 		}
 	}
 
 	g := &JumperGroup{
-		Leader: s.translateJumper(j, nil),
+		Leader: s.translateJumper(j, nil, load),
 	}
 	for _, member := range j.GroupMembers {
-		g.Members = append(g.Members, s.translateJumper(member, g.Leader))
+		g.Members = append(g.Members, s.translateJumper(member, g.Leader, load))
 	}
 
 	return &LoadSlot{
@@ -306,13 +306,13 @@ func (s *manifestServiceServer) constructUpdate(source core.DataSource) *Manifes
 				IsNoTime:          l.IsNoTime,
 			}
 			for _, j := range l.Tandems {
-				load.Slots = append(load.Slots, s.slotFromJumper(j))
+				load.Slots = append(load.Slots, s.slotFromJumper(j, l))
 			}
 			for _, j := range l.Students {
-				load.Slots = append(load.Slots, s.slotFromJumper(j))
+				load.Slots = append(load.Slots, s.slotFromJumper(j, l))
 			}
 			for _, j := range l.SportJumpers {
-				load.Slots = append(load.Slots, s.slotFromJumper(j))
+				load.Slots = append(load.Slots, s.slotFromJumper(j, l))
 			}
 
 			var slotsAvailable string
