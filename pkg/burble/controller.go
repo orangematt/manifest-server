@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -158,12 +159,24 @@ func (c *Controller) Refresh() (bool, error) {
 
 	var rawBurbleData interface{}
 	if err = json.Unmarshal(data, &rawBurbleData); err != nil {
+		// If we get unparseable data, dump it to a file so we can
+		// review it later to see what the problem is.
+		_ = ioutil.WriteFile("burble.json", data, 0644)
+		if err = c.RefreshCookies(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error refreshing cookies: %v\n", err)
+		}
 		return false, err
 	}
 
 	var loads []*Load
 	burbleData := rawBurbleData.(map[string]interface{})
 	if _, ok := burbleData["loads"]; !ok {
+		// If we get unparseable data, dump it to a file so we can
+		// review it later to see what the problem is.
+		_ = ioutil.WriteFile("burble.json", data, 0644)
+		if err = c.RefreshCookies(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error refreshing cookies: %v\n", err)
+		}
 		return false, errors.New("Burble data is missing load information")
 	}
 
