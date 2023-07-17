@@ -272,10 +272,15 @@ func (c *Controller) Refresh() (bool, error) {
 		// unique group to find groups with organizers. Any group that
 		// has no organizer is not treated as a group and all members
 		// are added to the manifest individually.
+		var lowPulls []*Jumper
 		l.SportJumpers = l.SportJumpers[:0]
 	outerLoop:
 		for _, members := range groupNames {
+			lowPull := true
 			for _, member := range members {
+				if !member.IsLowPull {
+					lowPull = false
+				}
 				if !member.IsOrganizer {
 					continue
 				}
@@ -289,7 +294,11 @@ func (c *Controller) Refresh() (bool, error) {
 				sort.Sort(JumpersByName(organizer.GroupMembers))
 				continue outerLoop
 			}
-			l.SportJumpers = append(l.SportJumpers, members...)
+			if lowPull {
+				lowPulls = append(lowPulls, members...)
+			} else {
+				l.SportJumpers = append(l.SportJumpers, members...)
+			}
 		}
 
 		// Sort tandems, students, and sport jumpers by name. Burble
@@ -299,6 +308,11 @@ func (c *Controller) Refresh() (bool, error) {
 		sort.Sort(JumpersByName(l.Tandems))
 		sort.Sort(JumpersByName(l.Students))
 		sort.Sort(JumpersByName(l.SportJumpers))
+
+		// Add low pulls to the end of sport jumpers so that they're
+		// always sorted to the bottom of manifest
+		sort.Sort(JumpersByName(lowPulls))
+		l.SportJumpers = append(l.SportJumpers, lowPulls...)
 
 		// Make private slots count against reserve slots. It
 		// would seem to be the case that PrivateSlots mean

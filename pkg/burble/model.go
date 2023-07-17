@@ -20,6 +20,7 @@ type Jumper struct {
 	IsOrganizer    bool      `json:"is_organizer"`
 	IsTurning      bool      `json:"is_turning"`
 	IsPondSwoop    bool      `json:"is_pond_swoop"`
+	IsLowPull      bool      `json:"is_low_pull"`
 }
 
 func NewJumper(id int64, name, shortName string) *Jumper {
@@ -36,6 +37,16 @@ func NewJumper(id int64, name, shortName string) *Jumper {
 	if jump == "vs" {
 		j.ShortName = "Video"
 		j.IsVideographer = true
+	}
+
+	if strings.HasSuffix(j.ShortName, " H/P") {
+		j.IsLowPull = true
+	}
+	if strings.HasPrefix(j.ShortName, "3-5k") {
+		j.IsLowPull = true
+	}
+	if strings.HasPrefix(j.ShortName, "3.5k") {
+		j.IsLowPull = true
 	}
 
 	return j
