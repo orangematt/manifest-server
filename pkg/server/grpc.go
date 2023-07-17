@@ -80,7 +80,11 @@ func (s *manifestServiceServer) translateJumper(j *burble.Jumper, leader *Jumper
 				prefix = "H&P"
 			}
 		case strings.HasPrefix(j.ShortName, "3-5k") || strings.HasPrefix(j.ShortName, "3.5k"):
-			color = 0xff00ff // magenta
+			if j.IsPondSwoop {
+				color = 0x00ffff // cyan
+			} else {
+				color = 0xff00ff // magenta
+			}
 			prefix = "H&P"
 		case j.IsPondSwoop:
 			color = 0x00ffff // cyan
