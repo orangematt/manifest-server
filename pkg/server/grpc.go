@@ -620,6 +620,7 @@ func (s *manifestServiceServer) VerifySessionID(
 
 	session, err := s.app.LookupSession(ctx, tx, req.SessionId)
 	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
 		sessionDeleted := false
 		if errors.Is(err, db.ErrInvalidSessionID) {
 			sessionDeleted = true
@@ -634,6 +635,7 @@ func (s *manifestServiceServer) VerifySessionID(
 
 	user, err := s.app.LookupUser(tx, session.UserID)
 	if err != nil {
+		_ = s.app.AbortDatabaseTransaction(tx)
 		return &SignInResponse{
 			ErrorMessage: fmt.Sprintf("LookupUser: %v", err),
 		}, nil
