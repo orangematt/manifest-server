@@ -141,7 +141,7 @@ func NewController(settings *settings.Settings) *Controller {
 	}
 }
 
-const metarURL = "https://aviationweather.gov/adds/dataserver_current/httpparam?datasource=metars&requesttype=retrieve&format=csv&hoursBeforeNow=24&mostRecent=true"
+const metarURL = "https://aviationweather.gov/cgi-bin/data/dataserver.php?datasource=metars&requesttype=retrieve&format=csv&hoursBeforeNow=24&mostRecent=true"
 
 // Refresh retrieves and parses weather data.
 func (c *Controller) Refresh() (bool, error) {
