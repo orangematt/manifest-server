@@ -70,7 +70,9 @@ func NewController(settings *settings.Settings) (*Controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.siwa.SetDelegate(c)
+	if c.siwa != nil {
+		c.siwa.SetDelegate(c)
+	}
 
 	c.db, err = db.Connect(settings)
 	if err != nil {
