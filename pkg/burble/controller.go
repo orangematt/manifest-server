@@ -343,17 +343,7 @@ func (c *Controller) Refresh() (bool, error) {
 		loads = append(loads, &l)
 	}
 
-	for i := 0; i < len(loads)-1; i++ {
-		thisLoad := loads[i]
-		nextLoad := loads[i+1]
-		thisLoad.ForEachJumper(func(thisJumper *Jumper) {
-			nextLoad.ForEachJumper(func(nextJumper *Jumper) {
-				if thisJumper.Name == nextJumper.Name {
-					nextJumper.IsTurning = true
-				}
-			})
-		})
-	}
+	c.markTurningJumpers(loads)
 
 	// Delete loads with CallMinutes older than our minimum setting
 	minCallMinutes := c.settings.MinCallMinutes()
@@ -381,6 +371,28 @@ func (c *Controller) Refresh() (bool, error) {
 	}
 
 	return changed, nil
+}
+
+func (c *Controller) markTurningJumpers(allLoads []*Load) {
+	loadsByAircraft := make(map[string][]*Load)
+	for _, load := range allLoads {
+		name := load.AircraftName
+		loadsByAircraft[name] = append(loadsByAircraft[name], load)
+	}
+
+	for _, loads := range loadsByAircraft {
+		for i := 0; i < len(loads)-1; i++ {
+			thisLoad := loads[i]
+			nextLoad := loads[i+1]
+			thisLoad.ForEachJumper(func(thisJumper *Jumper) {
+				nextLoad.ForEachJumper(func(nextJumper *Jumper) {
+					if thisJumper.Name == nextJumper.Name {
+						nextJumper.IsTurning = true
+					}
+				})
+			})
+		}
+	}
 }
 
 func (c *Controller) Loads() []*Load {
