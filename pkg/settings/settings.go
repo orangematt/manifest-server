@@ -40,7 +40,7 @@ type Settings struct {
 	template *template.Template
 }
 
-func NewSettings() (*Settings, error) {
+func newSettings() *Settings {
 	s := &Settings{
 		config:  viper.New(),
 		options: defaultOptions,
@@ -59,17 +59,38 @@ func NewSettings() (*Settings, error) {
 		}
 	}
 
-	s.config.AddConfigPath("/etc/manifest-server")
-	s.config.AddConfigPath("$HOME/.manifest-server")
-	s.config.AddConfigPath(".")
-	if err := s.config.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("Could not read config: %w\n", err)
-	}
+	return s;
+}
 
+func (s *Settings) loadConfig() error {
+	if err := s.config.ReadInConfig(); err != nil {
+		return fmt.Errorf("Could not read config: %w\n", err)
+	}
 	if err := s.restore(); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not read options: %v\n", err)
 	}
+	return nil;
+}
 
+func NewSettings() (*Settings, error) {
+	s := newSettings()
+	s.config.AddConfigPath("/etc/manifest-server")
+	s.config.AddConfigPath("$HOME/.manifest-server")
+	s.config.AddConfigPath(".")
+
+	if err := s.loadConfig(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+func NewSettingsWithFilename(filename string) (*Settings, error) {
+	s := newSettings()
+	s.config.SetConfigFile(filename)
+
+	if err := s.loadConfig(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
