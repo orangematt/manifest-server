@@ -180,6 +180,7 @@ func (c *Controller) Refresh() (bool, error) {
 		return false, errors.New("Burble data is missing load information")
 	}
 
+	definedJumptypeGroups := c.settings.GroupByJumpTypes()
 	organizerStrings := c.settings.OrganizerStrings()
 	sourceLoads := burbleData["loads"].([]interface{})
 	columnCount := burbleNumColumns - 1
@@ -230,6 +231,7 @@ func (c *Controller) Refresh() (bool, error) {
 		maxSlots := decode.Int("max_slots", loadData["max_slots"])
 		reserveSlots := decode.Int("reserve_slots", loadData["reserve_slots"])
 
+		jumptypeGroups := make(map[string]*Jumper)
 		groups := loadData["groups"].([]interface{})
 		for _, rawGroupData := range groups {
 			members := rawGroupData.([]interface{})
@@ -244,6 +246,23 @@ func (c *Controller) Refresh() (bool, error) {
 				}
 			}
 
+			for gx, g := range definedJumptypeGroups {
+				if jump == g.JumpType {
+					_, gok := jumptypeGroups[jump]
+					if !gok {
+						jumptypeGroups[jump] = &Jumper{
+							ID:          int64(gx),
+							Name:        g.ManifestHeading,
+							IsOrganizer: true,
+							GroupName:   g.JumpType,
+						}
+						l.SportJumpers = append(l.SportJumpers, jumptypeGroups[jump])
+					}
+					primaryJumper.GroupName = g.JumpType
+					primaryJumper.ShortName = ""
+					break
+				}
+			}
 			switch memberData["type"].(string) {
 			case "Sport Jumper":
 				l.SportJumpers = append(l.SportJumpers, primaryJumper)
@@ -285,8 +304,7 @@ func (c *Controller) Refresh() (bool, error) {
 		// unique group to find groups with organizers. Any group that
 		// has no organizer is not treated as a group and all members
 		// are added to the manifest individually.
-		var lowPulls []*Jumper
-		l.SportJumpers = l.SportJumpers[:0]
+		var groupedJumpers, lowPulls, sportJumpers []*Jumper
 	outerLoop:
 		for _, members := range groupNames {
 			lowPull := true
@@ -298,7 +316,7 @@ func (c *Controller) Refresh() (bool, error) {
 					continue
 				}
 				organizer := member
-				l.SportJumpers = append(l.SportJumpers, organizer)
+				groupedJumpers = append(groupedJumpers, organizer)
 				for _, m := range members {
 					if m != organizer {
 						organizer.AddGroupMember(m)
@@ -310,7 +328,7 @@ func (c *Controller) Refresh() (bool, error) {
 			if lowPull {
 				lowPulls = append(lowPulls, members...)
 			} else {
-				l.SportJumpers = append(l.SportJumpers, members...)
+				sportJumpers = append(sportJumpers, members...)
 			}
 		}
 
@@ -320,10 +338,12 @@ func (c *Controller) Refresh() (bool, error) {
 		// locale aware surname.
 		sort.Sort(JumpersByName(l.Tandems))
 		sort.Sort(JumpersByName(l.Students))
-		sort.Sort(JumpersByName(l.SportJumpers))
 
-		// Add low pulls to the end of sport jumpers so that they're
-		// always sorted to the bottom of manifest
+		l.SportJumpers = l.SportJumpers[:0]
+		sort.Sort(JumpersByName(groupedJumpers))
+		l.SportJumpers = append(l.SportJumpers, groupedJumpers...)
+		sort.Sort(JumpersByName(sportJumpers))
+		l.SportJumpers = append(l.SportJumpers, sportJumpers...)
 		sort.Sort(JumpersByName(lowPulls))
 		l.SportJumpers = append(l.SportJumpers, lowPulls...)
 
