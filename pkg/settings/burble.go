@@ -62,3 +62,34 @@ func (s *Settings) GroupByJumpTypes() []GroupByJumpType {
 	}
 	return result
 }
+
+func (s *Settings) ShortNameRewrites() map[string]string {
+	raw_rewrites := s.config.Get("burble.short_name_rewrites")
+	rewrites, ok := raw_rewrites.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for _, r := range rewrites {
+		rr, rrok := r.(map[string]interface{})
+		if !rrok {
+			continue
+		}
+
+		from, fok := rr["from"].(string)
+		if !fok {
+			fmt.Fprintf(os.Stderr, "error: missing from for burble.short_name_rewrites\n")
+			continue
+		}
+
+		to, tok := rr["to"].(string)
+		if !tok {
+			fmt.Fprintf(os.Stderr, "error: missing to for burlbe.short_name_rewrites\n")
+			continue
+		}
+
+		result[from] = to
+	}
+	return result
+}

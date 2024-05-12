@@ -44,12 +44,35 @@ func parseGroupName(s string) string {
 	return s
 }
 
-func jumperFromJSON(json map[string]interface{}) *Jumper {
+type Controller struct {
+	settings    *settings.Settings
+	columnCount int
+	loads       []*Load
+
+	shortNameRewrites map[string]string
+
+	lock sync.Mutex
+}
+
+func NewController(settings *settings.Settings) *Controller {
+	return &Controller{
+		settings:          settings,
+		shortNameRewrites: settings.ShortNameRewrites(),
+	}
+}
+
+func (c *Controller) jumperFromJSON(json map[string]interface{}) *Jumper {
 	name := json["name"].(string)
 	id := decode.Int("id", json["id"])
 	shortName := json["jump"].(string)
 	if s, ok := json["handycam_jump"].(string); ok && s != "" {
 		shortName = "Handycam"
+	}
+
+	if c.shortNameRewrites != nil {
+		if to, tok := c.shortNameRewrites[shortName]; tok {
+			shortName = to
+		}
 	}
 
 	jumper := NewJumper(id, name, shortName)
@@ -73,20 +96,6 @@ func jumperFromJSON(json map[string]interface{}) *Jumper {
 		jumper.RigName = rigName
 	}
 	return jumper
-}
-
-type Controller struct {
-	settings    *settings.Settings
-	columnCount int
-	loads       []*Load
-
-	lock sync.Mutex
-}
-
-func NewController(settings *settings.Settings) *Controller {
-	return &Controller{
-		settings: settings,
-	}
 }
 
 // RefreshCookies makes a throw-away request to get cookies from Burble so that
@@ -236,7 +245,7 @@ func (c *Controller) Refresh() (bool, error) {
 		for _, rawGroupData := range groups {
 			members := rawGroupData.([]interface{})
 			memberData := members[0].(map[string]interface{})
-			primaryJumper := jumperFromJSON(memberData)
+			primaryJumper := c.jumperFromJSON(memberData)
 
 			jump := strings.ToLower(primaryJumper.ShortName)
 			for _, o := range organizerStrings {
@@ -284,7 +293,7 @@ func (c *Controller) Refresh() (bool, error) {
 				if i < 1 {
 					continue
 				}
-				jumper := jumperFromJSON(memberData)
+				jumper := c.jumperFromJSON(memberData)
 				primaryJumper.AddGroupMember(jumper)
 			}
 		}
