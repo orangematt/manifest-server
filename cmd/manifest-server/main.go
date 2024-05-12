@@ -3,6 +3,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -44,8 +45,19 @@ func newWebServer(app *core.Controller) (*server.WebServer, error) {
 	return webServer, nil
 }
 
+func newSettings(configFilename string) (*settings.Settings, error) {
+	if configFilename != "" {
+		return settings.NewSettingsWithFilename(configFilename)
+	}
+	return settings.NewSettings()
+}
+
 func main() {
-	settings, err := settings.NewSettings()
+	var configFilename string
+	flag.StringVar(&configFilename, "config", "", "specify config filename to use")
+	flag.Parse()
+
+	settings, err := newSettings(configFilename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
